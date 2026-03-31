@@ -13,7 +13,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Window;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import com.badlogic.gdx.maps.*;;
+;
 
 /** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
 public class Main extends ApplicationAdapter {
@@ -36,7 +36,7 @@ public class Main extends ApplicationAdapter {
                 //button.setText("Clicked.");
 
                 window.clearChildren();
-                GameMap gameMap = new GameMap(16, 32) ;
+                GameMap gameMap = new GameMap(216, 108) ;
                 char[][] grid = gameMap.getGrid() ;
                 
                 StringBuilder mapText = new StringBuilder();
@@ -48,6 +48,12 @@ public class Main extends ApplicationAdapter {
                 }
                 Label mapLabel = new Label(mapText.toString(), skin);
                  window.add(mapLabel);
+
+                window.pack();
+                window.setPosition(MathUtils.roundPositive(stage.getWidth() / 2f - window.getWidth() / 2f),
+                MathUtils.roundPositive(stage.getHeight() / 2f - window.getHeight() / 2f));
+
+
             }
         });
         window.add(button);

@@ -1,5 +1,5 @@
 // GameMap.java
-
+package adfinir.game;
 import java.util.Random;
 
 public class GameMap {
