@@ -1,92 +1,26 @@
 package adfinir.game;
 
-import com.badlogic.gdx.ApplicationAdapter;
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.scenes.scene2d.Actor;
-import com.badlogic.gdx.scenes.scene2d.Stage;
-import com.badlogic.gdx.scenes.scene2d.actions.Actions;
-import com.badlogic.gdx.scenes.scene2d.ui.Label;
-import com.badlogic.gdx.scenes.scene2d.ui.Skin;
-import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.ui.Window;
-import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
-import com.badlogic.gdx.utils.ScreenUtils;
-import com.badlogic.gdx.utils.viewport.FitViewport;
-;
+import adfinir.game.screens.MainMenuScreen;
+import com.badlogic.gdx.Game;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 
-/** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
-public class Main extends ApplicationAdapter {
-    private Stage stage;
-    private Skin skin;
+/**
+ * Point d'entrée principal du jeu.
+ * Étend Game (et non ApplicationAdapter) pour gérer les Screens.
+ */
+public class Main extends Game {
+
+    public SpriteBatch batch;
 
     @Override
     public void create() {
-        stage = new Stage(new FitViewport(640, 480));
-        skin = new Skin(Gdx.files.internal("ui/uiskin.json"));
-
-        Window window = new Window("Example screen", skin, "border");
-        window.defaults().pad(4f);
-        window.add("This is a simple Scene2D view.").row();
-        final TextButton button = new TextButton("Click me!", skin);
-        button.pad(8f);
-        button.addListener(new ChangeListener() {
-            @Override
-            public void changed(final ChangeEvent event, final Actor actor) {
-                //button.setText("Clicked.");
-
-                window.clearChildren();
-                GameMap gameMap = new GameMap(216, 108) ;
-                char[][] grid = gameMap.getGrid() ;
-                
-                StringBuilder mapText = new StringBuilder();
-                for (int y = 0; y < gameMap.getHeight(); y++) {
-                    for (int x = 0; x < gameMap.getWidth(); x++) {
-                        mapText.append(grid[y][x]).append(" ");
-                    }
-                    mapText.append("\n");
-                }
-                Label mapLabel = new Label(mapText.toString(), skin);
-                 window.add(mapLabel);
-
-                window.pack();
-                window.setPosition(MathUtils.roundPositive(stage.getWidth() / 2f - window.getWidth() / 2f),
-                MathUtils.roundPositive(stage.getHeight() / 2f - window.getHeight() / 2f));
-
-
-            }
-        });
-        window.add(button);
-        window.pack();
-        // We round the window position to avoid awkward half-pixel artifacts.
-        // Casting using (int) would also work.
-        window.setPosition(MathUtils.roundPositive(stage.getWidth() / 2f - window.getWidth() / 2f),
-            MathUtils.roundPositive(stage.getHeight() / 2f - window.getHeight() / 2f));
-        window.addAction(Actions.sequence(Actions.alpha(0f), Actions.fadeIn(1f)));
-        stage.addActor(window);
-
-        Gdx.input.setInputProcessor(stage);
-    }
-
-    @Override
-    public void render() {
-        ScreenUtils.clear(0f, 0f, 0f, 1f);
-        stage.act(Gdx.graphics.getDeltaTime());
-        stage.draw();
-    }
-
-    @Override
-    public void resize(int width, int height) {
-        // If the window is minimized on a desktop (LWJGL3) platform, width and height are 0, which causes problems.
-        // In that case, we don't resize anything, and wait for the window to be a normal size before updating.
-        if(width <= 0 || height <= 0) return;
-
-        stage.getViewport().update(width, height);
+        batch = new SpriteBatch();
+        setScreen(new MainMenuScreen(this));
     }
 
     @Override
     public void dispose() {
-        stage.dispose();
-        skin.dispose();
+        super.dispose();
+        batch.dispose();
     }
 }
