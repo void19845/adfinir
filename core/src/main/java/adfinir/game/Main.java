@@ -6,12 +6,14 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Window;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.maps.*;;
 
 /** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
 public class Main extends ApplicationAdapter {
@@ -31,7 +33,21 @@ public class Main extends ApplicationAdapter {
         button.addListener(new ChangeListener() {
             @Override
             public void changed(final ChangeEvent event, final Actor actor) {
-                button.setText("Clicked.");
+                //button.setText("Clicked.");
+
+                window.clearChildren();
+                GameMap gameMap = new GameMap(16, 32) ;
+                char[][] grid = gameMap.getGrid() ;
+                
+                StringBuilder mapText = new StringBuilder();
+                for (int y = 0; y < gameMap.getHeight(); y++) {
+                    for (int x = 0; x < gameMap.getWidth(); x++) {
+                        mapText.append(grid[y][x]).append(" ");
+                    }
+                    mapText.append("\n");
+                }
+                Label mapLabel = new Label(mapText.toString(), skin);
+                 window.add(mapLabel);
             }
         });
         window.add(button);
