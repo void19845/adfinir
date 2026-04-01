@@ -1,16 +1,5 @@
 package adfinir.game.screens;
 
-import adfinir.game.Main;
-import adfinir.game.dungeon.DungeonGenerator;
-import adfinir.game.dungeon.DungeonMap;
-import adfinir.game.dungeon.DungeonRenderer;
-import adfinir.game.ecs.components.PlayerInputComponent;
-import adfinir.game.ecs.components.RenderComponent;
-import adfinir.game.ecs.components.TransformComponent;
-import adfinir.game.ecs.components.VelocityComponent;
-import adfinir.game.ecs.systems.MovementSystem;
-import adfinir.game.ecs.systems.PlayerInputSystem;
-import adfinir.game.ecs.systems.RenderSystem;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.gdx.Gdx;
@@ -23,6 +12,18 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+
+import adfinir.game.Main;
+import adfinir.game.dungeon.DungeonGenerator;
+import adfinir.game.dungeon.DungeonMap;
+import adfinir.game.dungeon.DungeonRenderer;
+import adfinir.game.ecs.components.PlayerInputComponent;
+import adfinir.game.ecs.components.RenderComponent;
+import adfinir.game.ecs.components.TransformComponent;
+import adfinir.game.ecs.components.VelocityComponent;
+import adfinir.game.ecs.systems.MovementSystem;
+import adfinir.game.ecs.systems.PlayerInputSystem;
+import adfinir.game.ecs.systems.RenderSystem;
 
 public class GameScreen implements Screen {
 
