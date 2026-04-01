@@ -1,5 +1,20 @@
 package adfinir.game.screens;
 
+import adfinir.game.Main;
+import adfinir.game.dungeon.DungeonGenerator;
+import adfinir.game.dungeon.DungeonMap;
+import adfinir.game.dungeon.DungeonRenderer;
+import adfinir.game.ecs.components.PlayerInputComponent;
+import adfinir.game.ecs.components.RenderComponent;
+import adfinir.game.ecs.components.TransformComponent;
+import adfinir.game.ecs.components.VelocityComponent;
+// --- AJOUT : Imports pour la barre de vie ---
+import adfinir.game.ecs.components.HealthComponent;
+import adfinir.game.ecs.systems.HealthBarRenderSystem; // ERREUR 2000
+// --------------------------------------------
+import adfinir.game.ecs.systems.MovementSystem;
+import adfinir.game.ecs.systems.PlayerInputSystem;
+import adfinir.game.ecs.systems.RenderSystem;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.gdx.Gdx;
@@ -12,18 +27,6 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-
-import adfinir.game.Main;
-import adfinir.game.dungeon.DungeonGenerator;
-import adfinir.game.dungeon.DungeonMap;
-import adfinir.game.dungeon.DungeonRenderer;
-import adfinir.game.ecs.components.PlayerInputComponent;
-import adfinir.game.ecs.components.RenderComponent;
-import adfinir.game.ecs.components.TransformComponent;
-import adfinir.game.ecs.components.VelocityComponent;
-import adfinir.game.ecs.systems.MovementSystem;
-import adfinir.game.ecs.systems.PlayerInputSystem;
-import adfinir.game.ecs.systems.RenderSystem;
 
 public class GameScreen implements Screen {
 
@@ -74,6 +77,10 @@ public class GameScreen implements Screen {
         engine.addSystem(new PlayerInputSystem());
         engine.addSystem(new MovementSystem(dungeonMap));
         engine.addSystem(new RenderSystem(shapeRenderer));
+        
+        // rendu de la barre de vie 
+        engine.addSystem(new HealthBarRenderSystem(shapeRenderer));
+        // ----------------------------------------------------------------
 
         // Entité joueur — on le place sur la première tile de sol disponible
         player = new Entity();
@@ -91,10 +98,21 @@ public class GameScreen implements Screen {
         PlayerInputComponent playerInput = new PlayerInputComponent();
         playerInput.speed = 80f;
 
+        //  config la vie du joueu
+        HealthComponent playerHealth = new HealthComponent();
+        playerHealth.maxHealth = 100f;
+        playerHealth.currentHealth = 80f; // On met 80 pour que tu voies qu'elle n'est pas pleine au début
+        // --------------------------------------------------------
+
         player.add(playerTransform);
         player.add(playerVel);
         player.add(playerRender);
         player.add(playerInput);
+        
+        //  vie au joueur ---
+        player.add(playerHealth);
+        // --------------------------------------------------------
+        
         engine.addEntity(player);
     }
 
@@ -106,6 +124,16 @@ public class GameScreen implements Screen {
             dispose();
             return;
         }
+
+        // --- AJOUT : Touche H pour tester la perte de vie ---
+        if (Gdx.input.isKeyJustPressed(Input.Keys.H)) {
+            HealthComponent health = player.getComponent(HealthComponent.class);
+            if (health != null) {
+                health.currentHealth -= 10f;
+                if (health.currentHealth < 0) health.currentHealth = 0;
+            }
+        }
+        // ----------------------------------------------------
 
         // --- Mise à jour ECS (hors rendu) ---
         // On met à jour manuellement les systèmes non-rendu d'abord
@@ -145,6 +173,10 @@ public class GameScreen implements Screen {
 
         // Rendu des entités (RenderSystem utilise le shapeRenderer déjà ouvert)
         engine.getSystem(RenderSystem.class).update(delta);
+        
+        // --- AJOUT : Rendu des barres de vie ---
+        engine.getSystem(ealthBarRenderSystem.class).update(delta);
+        // ---------------------------------------
 
         shapeRenderer.end();
     }
