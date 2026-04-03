@@ -186,7 +186,8 @@ public class DungeonGenerator {
         int to   = Math.max(x1, x2);
         for (int c = from; c <= to; c++)
             if (c >= 0 && c < cols && y >= 0 && y < rows)
-                grid[y][c] = DungeonMap.TILE_FLOOR;
+                if (grid[y][c] == DungeonMap.TILE_WALL)
+                    grid[y][c] = DungeonMap.TILE_CORRIDOR;
     }
 
     private void carveVCorridor(int y1, int y2, int x) {
@@ -194,7 +195,8 @@ public class DungeonGenerator {
         int to   = Math.max(y1, y2);
         for (int r = from; r <= to; r++)
             if (r >= 0 && r < rows && x >= 0 && x < cols)
-                grid[r][x] = DungeonMap.TILE_FLOOR;
+                if (grid[r][x] == DungeonMap.TILE_WALL)
+                    grid[r][x] = DungeonMap.TILE_CORRIDOR;
     }
 
     // ---------------------------------------------------------------

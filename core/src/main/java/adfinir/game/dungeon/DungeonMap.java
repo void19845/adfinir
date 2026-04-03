@@ -10,9 +10,10 @@ package adfinir.game.dungeon;
  */
 public class DungeonMap {
 
-    public static final int TILE_EMPTY = 0;
-    public static final int TILE_WALL  = 1;
-    public static final int TILE_FLOOR = 2;
+    public static final int TILE_EMPTY    = 0;
+    public static final int TILE_WALL     = 1;
+    public static final int TILE_FLOOR    = 2;
+    public static final int TILE_CORRIDOR = 3;
 
     public static final int TILE_SIZE = 16; // pixels par tile
 
@@ -48,6 +49,10 @@ public class DungeonMap {
         int row  = (int) Math.floor(py / TILE_SIZE);
         int tile = getTile(col, row);
         return tile == TILE_WALL || tile == TILE_EMPTY;
+    }
+
+    public boolean isFloorLike(int tile) {
+        return tile == TILE_FLOOR || tile == TILE_CORRIDOR;
     }
 
     /** Coordonnée X pixel du centre de spawn. */

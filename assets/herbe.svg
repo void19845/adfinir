@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Trois brins d'herbe verts -->
+  <path d="M 20 100 Q 10 50 30 20 Q 25 50 40 100 Z" fill="#4CAF50" />
+  <path d="M 45 100 Q 40 40 50 10 Q 60 40 55 100 Z" fill="#388E3C" />
+  <path d="M 70 100 Q 80 50 65 30 Q 75 50 85 100 Z" fill="#66BB6A" />
+</svg>

@@ -1,0 +1,82 @@
+{
+  "_commentaire": "Fichier de configuration des items. Ajoute ici tes propres armes, armures et artefacts.",
+  "_raretés": ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"],
+  "_slots_artefact": ["FLOWER", "FEATHER", "CLOCK", "CUP", "CROWN"],
+  "_mainStats_artefact": ["HP", "ATK", "DEF", "CRIT_RATE", "CRIT_DMG", "ELEM_MASTERY"],
+
+  "weapons": [
+    { "name": "Épée rouillée",    "rarity": "COMMON",    "atkBonus": 5  },
+    { "name": "Épée de fer",      "rarity": "UNCOMMON",  "atkBonus": 12 },
+    { "name": "Épée en acier",    "rarity": "RARE",      "atkBonus": 22 },
+    { "name": "Lame du chaos",    "rarity": "EPIC",      "atkBonus": 35 },
+    { "name": "Épée légendaire",  "rarity": "LEGENDARY", "atkBonus": 55 },
+    { "name": "Dague rapide",     "rarity": "UNCOMMON",  "atkBonus": 10 },
+    { "name": "Bâton de guerre",  "rarity": "RARE",      "atkBonus": 20 }
+  ],
+
+  "armors": [
+    { "name": "Armure en cuir",   "rarity": "COMMON",    "defBonus": 5  },
+    { "name": "Armure en fer",    "rarity": "UNCOMMON",  "defBonus": 12 },
+    { "name": "Armure en acier",  "rarity": "RARE",      "defBonus": 20 },
+    { "name": "Armure du dragon", "rarity": "EPIC",      "defBonus": 32 },
+    { "name": "Bouclier de rune", "rarity": "LEGENDARY", "defBonus": 50 }
+  ],
+
+  "artifacts": [
+    {
+      "name": "Fleur de l'aventurier",
+      "rarity": "COMMON",
+      "slot": "FLOWER",
+      "mainStat": "HP",
+      "mainValue": 200,
+      "atkBonus": 3,
+      "defBonus": 0,
+      "critRateBonus": 0.0,
+      "critDmgBonus": 0.0
+    },
+    {
+      "name": "Plume du héros",
+      "rarity": "UNCOMMON",
+      "slot": "FEATHER",
+      "mainStat": "ATK",
+      "mainValue": 20,
+      "atkBonus": 0,
+      "defBonus": 5,
+      "critRateBonus": 0.02,
+      "critDmgBonus": 0.0
+    },
+    {
+      "name": "Sablier du destin",
+      "rarity": "RARE",
+      "slot": "CLOCK",
+      "mainStat": "CRIT_RATE",
+      "mainValue": 0.08,
+      "atkBonus": 5,
+      "defBonus": 0,
+      "critRateBonus": 0.0,
+      "critDmgBonus": 0.10
+    },
+    {
+      "name": "Calice de l'abysse",
+      "rarity": "EPIC",
+      "slot": "CUP",
+      "mainStat": "ATK",
+      "mainValue": 35,
+      "atkBonus": 0,
+      "defBonus": 8,
+      "critRateBonus": 0.03,
+      "critDmgBonus": 0.06
+    },
+    {
+      "name": "Diadème d'obsidienne",
+      "rarity": "LEGENDARY",
+      "slot": "CROWN",
+      "mainStat": "CRIT_DMG",
+      "mainValue": 0.30,
+      "atkBonus": 10,
+      "defBonus": 10,
+      "critRateBonus": 0.05,
+      "critDmgBonus": 0.0
+    }
+  ]
+}

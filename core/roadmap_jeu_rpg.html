@@ -1,0 +1,227 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:transparent;}
+:root{
+  --gold:#c9a84c;--gold2:#e8c97a;--dark:#0d0b12;--dark2:#13111e;--dark3:#1a1728;
+  --red:#b83232;--green:#2e7d52;--blue:#2558a0;--purple:#5c3a8c;
+  --text:#e8dfc8;--muted:#8a7e66;--border:rgba(201,168,76,0.2);
+}
+.wrap{background:linear-gradient(160deg,#0d0b12 0%,#13111e 50%,#0f0d18 100%);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden;
+  font-family:'Crimson Pro',serif;color:var(--text);min-height:600px;}
+.header{padding:28px 32px 20px;border-bottom:1px solid var(--border);
+  background:linear-gradient(to right,rgba(201,168,76,0.06),transparent);position:relative;}
+.header::before{content:'⚔';position:absolute;right:28px;top:50%;transform:translateY(-50%);
+  font-size:48px;opacity:0.07;}
+.game-title{font-family:'Cinzel',serif;font-size:22px;font-weight:700;color:var(--gold);letter-spacing:2px;}
+.game-sub{font-size:14px;color:var(--muted);margin-top:4px;letter-spacing:0.5px;}
+.tags{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.tag{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid;font-family:'Cinzel',serif;letter-spacing:0.5px;}
+.tag.java{border-color:#e8762b;color:#e8762b;background:rgba(232,118,43,0.08);}
+.tag.libgdx{border-color:#6ab04c;color:#6ab04c;background:rgba(106,176,76,0.08);}
+.tag.pixel{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,0.08);}
+.tag.coop{border-color:#4a9eda;color:#4a9eda;background:rgba(74,158,218,0.08);}
+
+.timeline{padding:24px 32px;}
+.phase{margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden;
+  transition:border-color 0.2s;}
+.phase:hover{border-color:rgba(201,168,76,0.45);}
+.phase-header{padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px;
+  background:rgba(255,255,255,0.02);user-select:none;}
+.phase-num{font-family:'Cinzel',serif;font-size:11px;color:var(--muted);min-width:56px;letter-spacing:1px;}
+.phase-icon{font-size:18px;width:28px;text-align:center;}
+.phase-name{font-family:'Cinzel',serif;font-size:14px;font-weight:600;flex:1;}
+.phase-duration{font-size:12px;padding:2px 10px;border-radius:20px;font-family:'Cinzel',serif;}
+.phase-arrow{color:var(--muted);font-size:12px;transition:transform 0.25s;}
+.phase.open .phase-arrow{transform:rotate(90deg);}
+.phase-body{display:none;padding:0 18px 16px;border-top:1px solid var(--border);}
+.phase.open .phase-body{display:block;}
+
+.phase-desc{font-size:14px;color:var(--muted);font-style:italic;margin:12px 0 14px;line-height:1.6;}
+.tasks{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media(max-width:500px){.tasks{grid-template-columns:1fr;}}
+.task{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;
+  border-radius:6px;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.05);}
+.task-dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+.task-text{font-size:13px;line-height:1.5;}
+.task-label{font-size:10px;font-family:'Cinzel',serif;letter-spacing:0.5px;opacity:0.7;display:block;}
+
+.milestone{margin-top:14px;padding:10px 14px;border-radius:6px;
+  background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);
+  display:flex;align-items:center;gap:10px;font-size:13px;}
+.milestone-icon{font-size:16px;}
+
+.rec-box{margin:0 32px 28px;padding:16px 18px;border-radius:10px;
+  background:rgba(44,88,160,0.12);border:1px solid rgba(74,158,218,0.25);}
+.rec-title{font-family:'Cinzel',serif;font-size:12px;color:#4a9eda;letter-spacing:1px;margin-bottom:10px;}
+.rec-list{display:flex;flex-direction:column;gap:6px;}
+.rec-item{font-size:13px;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.rec-item::before{content:'→';color:#4a9eda;flex-shrink:0;margin-top:1px;}
+
+.p1{} .p1 .phase-name{color:#e8762b;}
+.p1 .phase-duration{background:rgba(232,118,43,0.12);color:#e8762b;border:1px solid rgba(232,118,43,0.3);}
+.p1 .task-dot{background:#e8762b;}
+.p2 .phase-name{color:#c9a84c;}
+.p2 .phase-duration{background:rgba(201,168,76,0.12);color:#c9a84c;border:1px solid rgba(201,168,76,0.3);}
+.p2 .task-dot{background:#c9a84c;}
+.p3 .phase-name{color:#2e7d52;}
+.p3 .phase-duration{background:rgba(46,125,82,0.12);color:#4caf7d;border:1px solid rgba(46,125,82,0.3);}
+.p3 .task-dot{background:#4caf7d;}
+.p4 .phase-name{color:#4a9eda;}
+.p4 .phase-duration{background:rgba(74,158,218,0.12);color:#4a9eda;border:1px solid rgba(74,158,218,0.25);}
+.p4 .task-dot{background:#4a9eda;}
+.p5 .phase-name{color:#b39ddb;}
+.p5 .phase-duration{background:rgba(92,58,140,0.15);color:#b39ddb;border:1px solid rgba(92,58,140,0.35);}
+.p5 .task-dot{background:#b39ddb;}
+</style>
+
+<div class="wrap">
+  <div class="header">
+    <div class="game-title">FEUILLE DE ROUTE — RPG 2D</div>
+    <div class="game-sub">SAO-like · Vue du dessus · Java · Pixel Art · 2-3 développeurs · 3-6 mois</div>
+    <div class="tags">
+      <span class="tag java">Java</span>
+      <span class="tag libgdx">LibGDX recommandé</span>
+      <span class="tag pixel">Pixel Art</span>
+      <span class="tag coop">Co-op local</span>
+    </div>
+  </div>
+
+  <div class="timeline">
+
+    <div class="phase p1 open" id="ph1">
+      <div class="phase-header" onclick="toggle('ph1')">
+        <span class="phase-num">PHASE 1</span>
+        <span class="phase-icon">🏗</span>
+        <span class="phase-name">Fondations & Prototype</span>
+        <span class="phase-duration">Semaines 1–3</span>
+        <span class="phase-arrow">▶</span>
+      </div>
+      <div class="phase-body">
+        <p class="phase-desc">Mettre en place le socle technique avant de toucher au gameplay. C'est la phase la plus critique — une mauvaise architecture ici coûtera des semaines plus tard.</p>
+        <div class="tasks">
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">SETUP</span>Projet LibGDX, structure des packages, Git + branches par feature</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">MOTEUR</span>Game loop, delta time, caméra qui suit le joueur, rendu de tiles</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">CARTE</span>Tilemap (Tiled), chargement TMX, collisions AABB basiques</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">JOUEUR</span>Déplacement 4 directions, spritesheet animée, hitbox</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">ASSETS</span>Tileset placeholder (16×16 ou 32×32), décider la résolution définitive</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">CO-OP</span>Architecture pour 2 joueurs locaux (même clavier ou manettes)</div></div>
+        </div>
+        <div class="milestone"><span class="milestone-icon">🎯</span><span>Milestone : un joueur se déplace sur une map, la caméra le suit, les murs bloquent.</span></div>
+      </div>
+    </div>
+
+    <div class="phase p2" id="ph2">
+      <div class="phase-header" onclick="toggle('ph2')">
+        <span class="phase-num">PHASE 2</span>
+        <span class="phase-icon">⚔</span>
+        <span class="phase-name">Combat & Systèmes RPG Core</span>
+        <span class="phase-duration">Semaines 4–7</span>
+        <span class="phase-arrow">▶</span>
+      </div>
+      <div class="phase-body">
+        <p class="phase-desc">Le cœur du gameplay. Tout le reste (boss, artefacts, quêtes) s'appuie sur cette couche. Prendre le temps de la faire proprement.</p>
+        <div class="tasks">
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">COMBAT</span>Attaque mêlée, cooldown, hitbox d'attaque, knockback</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">STATS</span>HP, ATK, DEF, SPD, CRIT_RATE, CRIT_DMG (structure Entity)</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">MOBS</span>IA basique (patrouille → aggro → attaque), drops aléatoires</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">XP & NIVEAUX</span>Courbe d'XP, level-up avec bonus de stats, affichage</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">INVENTAIRE</span>Grille d'items, équipement (arme, armure, accessoires), tooltips</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">ITEMS</span>Classe Item, rareté (commun→légendaire), système de tags</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">ARTEFACTS</span>Objets équipables avec stats bonus, slot dédié, effets passifs</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">CRAFT</span>Recettes simples : ressource × N → item, interface de craft</div></div>
+        </div>
+        <div class="milestone"><span class="milestone-icon">🎯</span><span>Milestone : tuer un mob, looter une épée, l'équiper, voir ses dégâts changer.</span></div>
+      </div>
+    </div>
+
+    <div class="phase p3" id="ph3">
+      <div class="phase-header" onclick="toggle('ph3')">
+        <span class="phase-num">PHASE 3</span>
+        <span class="phase-icon">🗺</span>
+        <span class="phase-name">Monde, Biomes & Donjon Boss</span>
+        <span class="phase-duration">Semaines 8–13</span>
+        <span class="phase-arrow">▶</span>
+      </div>
+      <div class="phase-body">
+        <p class="phase-desc">La boucle de progression principale du jeu. Chaque biome est un niveau avec sa grotte, son boss, sa palette visuelle et ses mécaniques propres.</p>
+        <div class="tasks">
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">BIOME 1</span>Forêt (carte overworld + grotte + boss — ex: Gardien de Racines)</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">BIOME 2</span>Désert / Ruines (palette, mobs exclusifs, boss différent)</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">BOSS IA</span>Phases de combat, patterns d'attaque, seuil de rage à 50% HP</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">GATE SYSTEM</span>Vérifier conditions (items requis, niveau min) avant d'entrer dans la grotte</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">MINI-DONJONS</span>Salles procédurales optionnelles sur la carte, loot rare</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">TRANSITIONS</span>Portail vers le biome suivant après kill boss, cinématique simple</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">FARM LOOP</span>Respawn des mobs, zones de farm balisées, drop rates équilibrés</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">CARTE UI</span>Mini-map, marqueurs de donjons, zone explorée en brouillard</div></div>
+        </div>
+        <div class="milestone"><span class="milestone-icon">🎯</span><span>Milestone : farmer les 100 items requis, entrer dans la grotte, battre le boss, changer de biome.</span></div>
+      </div>
+    </div>
+
+    <div class="phase p4" id="ph4">
+      <div class="phase-header" onclick="toggle('ph4')">
+        <span class="phase-num">PHASE 4</span>
+        <span class="phase-icon">📜</span>
+        <span class="phase-name">Quêtes, Histoire & Social</span>
+        <span class="phase-duration">Semaines 14–17</span>
+        <span class="phase-arrow">▶</span>
+      </div>
+      <div class="phase-body">
+        <p class="phase-desc">Donner du sens à la progression. Les quêtes guident le joueur, le scénario l'accroche, la guilde lui donne un but long terme.</p>
+        <div class="tasks">
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">QUÊTES</span>Système de quêtes (kill X, collecter Y, explorer Z), journal UI</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">NPC</span>Dialogues simples, marchands, PNJ de quête</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">SCÉNARIO</span>Arc narratif principal : pourquoi les boss existent, lore par biome</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">GUILDE</span>Créer/rejoindre une guilde, objectifs collectifs, classement local</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">CO-OP LOCAL</span>2 joueurs sur le même écran (split ou shared cam), inventaires séparés</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">SAUVEGARDE</span>Save/load JSON ou SQLite, profils de personnage</div></div>
+        </div>
+        <div class="milestone"><span class="milestone-icon">🎯</span><span>Milestone : jouer à 2, suivre une quête principale, sauvegarder et reprendre.</span></div>
+      </div>
+    </div>
+
+    <div class="phase p5" id="ph5">
+      <div class="phase-header" onclick="toggle('ph5')">
+        <span class="phase-num">PHASE 5</span>
+        <span class="phase-icon">✨</span>
+        <span class="phase-name">Polish & Équilibrage</span>
+        <span class="phase-duration">Semaines 18–22</span>
+        <span class="phase-arrow">▶</span>
+      </div>
+      <div class="phase-body">
+        <p class="phase-desc">Ce qui transforme un projet en vrai jeu. Sons, effets, feedbacks visuels, équilibrage des stats — souvent sous-estimé, toujours essentiel.</p>
+        <div class="tasks">
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">AUDIO</span>Sons d'attaque, ambiance biome, musique de boss (assets libres de droits)</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">VFX</span>Particules de hit, flash de dégâts, aura des artefacts légendaires</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">UI/UX</span>HUD propre, écrans de menu, transitions, icônes d'items finales</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">BALANCE</span>Courbes de dégâts, taux de drop, difficulté des boss, test interne</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">BUGS</span>Playtests réguliers, tracker d'issues GitHub, correctifs</div></div>
+          <div class="task"><div class="task-dot"></div><div class="task-text"><span class="task-label">BUILD</span>Packaging JAR / installeur, README, documentation minimale</div></div>
+        </div>
+        <div class="milestone"><span class="milestone-icon">🎯</span><span>Milestone : v0.1 jouable de bout en bout, partageable à des testeurs externes.</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="rec-box">
+    <div class="rec-title">💡 RECOMMANDATIONS TECHNIQUES</div>
+    <div class="rec-list">
+      <div class="rec-item">Utilise <strong>LibGDX</strong> — parfait pour Java 2D, gère le rendu, l'audio, les inputs manettes, et exporte sur desktop/Android plus tard.</div>
+      <div class="rec-item">Éditeur de map : <strong>Tiled</strong> (gratuit) + plugin LibGDX TMX loader. Gain de temps énorme sur la création des biomes.</div>
+      <div class="rec-item">Organise ton code en <strong>ECS léger</strong> (Entity/Component/System) dès le départ — ça rend les artefacts et les stats modulaires sans spaghetti.</div>
+      <div class="rec-item">Pour le co-op local, prévoir <strong>2 gamepads via LibGDX Controllers</strong> plutôt que le clavier partagé — bien plus agréable à jouer.</div>
+      <div class="rec-item">Assets pixel art gratuits de qualité : <strong>Itch.io</strong> (0-cost assets) pour prototyper vite avant de créer les vôtres.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggle(id){
+  const el=document.getElementById(id);
+  el.classList.toggle('open');
+}
+</script>
