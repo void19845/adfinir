@@ -15,6 +15,7 @@ import adfinir.game.ecs.systems.MovementSystem;
 import adfinir.game.ecs.systems.PlayerInputSystem;
 import adfinir.game.ecs.systems.RenderSystem;
 import adfinir.game.ecs.systems.StatsSystem;
+import adfinir.game.player.Weapon;
 import adfinir.game.ui.StatsOverlay;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
@@ -92,7 +93,7 @@ public class GameScreen implements Screen {
         PlayerInputComponent playerInput = new PlayerInputComponent();
         playerInput.speed = 80f;
 
-        PlayerStatsComponent playerStats = new PlayerStatsComponent();
+        playerStats = new PlayerStatsComponent();
         CombatComponent playerCombat = new CombatComponent();
         playerCombat.weapon = Weapon.createSword(); // Equip une épée par défaut
 
