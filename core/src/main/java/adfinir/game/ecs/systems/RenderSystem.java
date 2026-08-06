@@ -54,12 +54,12 @@ public class RenderSystem extends IteratingSystem {
 
             switch (weapon.shape) {
                 case CONE:
-                    // Épée : On utilise la fonction cone de ShapeRenderer
+                    // Épée : On utilise l'arc de ShapeRenderer pour créer un cône (wedge)
                     float angle = 60f; // Largeur du cône en degrés
                     float centralAngle = (float) Math.toDegrees(Math.atan2(dy, dx));
                     float startAngle = centralAngle - angle / 2f;
 
-                    shapeRenderer.cone(
+                    shapeRenderer.arc(
                         pos.x, pos.y,
                         weapon.range / 2f,
                         startAngle,
