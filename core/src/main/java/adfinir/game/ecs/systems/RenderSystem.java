@@ -3,6 +3,7 @@ package adfinir.game.ecs.systems;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.RenderComponent;
 import adfinir.game.ecs.components.TransformComponent;
+import adfinir.game.player.AttackShape;
 import adfinir.game.player.Weapon;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
@@ -47,15 +48,49 @@ public class RenderSystem extends IteratingSystem {
         if (combat != null && combat.isAttacking && combat.weapon != null) {
             Weapon weapon = combat.weapon;
             shapeRenderer.setColor(Color.RED);
-            // On dessine un rectangle devant le joueur.
-            // Note: Pour l'instant on dessine un carré centré,
-            // mais on pourrait le décaler selon la direction du mouvement.
-            shapeRenderer.rect(
-                pos.x - weapon.range / 2f,
-                pos.y - weapon.range / 2f,
-                weapon.range,
-                weapon.range
-            );
+
+            float dx = combat.attackDirX;
+            float dy = combat.attackDirY;
+
+            switch (weapon.shape) {
+                case SQUARE:
+                    shapeRenderer.rect(
+                        pos.x - weapon.range / 2f,
+                        pos.y - weapon.range / 2f,
+                        weapon.range,
+                        weapon.range
+                    );
+                    break;
+                case RECTANGLE:
+                    // Lance : rectangle long et étroit orienté vers la direction d'attaque
+                    float halfW = weapon.width / 2f;
+                    float halfL = weapon.range / 2f;
+
+                    // On centre le rectangle sur le joueur mais on le décale légèrement vers l'avant
+                    float centerX = pos.x + dx * (weapon.range / 2f);
+                    float centerY = pos.y + dy * (weapon.range / 2f);
+
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        shapeRenderer.rect(
+                            centerX - (dx > 0 ? weapon.range/2f : 0),
+                            centerY - halfW,
+                            weapon.range,
+                            weapon.width
+                        );
+                    } else {
+                        shapeRenderer.rect(
+                            centerX - halfW,
+                            centerY - (dy > 0 ? weapon.range/2f : 0),
+                            weapon.width,
+                            weapon.range
+                        );
+                    }
+                    break;
+                case ARC:
+                    // Hache : cercle pour représenter la portée de l'arc
+                    shapeRenderer.circle(pos.x, pos.y, weapon.range / 2f);
+                    break;
+            }
         }
     }
 }

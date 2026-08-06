@@ -43,7 +43,18 @@ public class PlayerInputSystem extends IteratingSystem {
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             CombatComponent combat = cm.get(entity);
             if (combat != null && combat.canAttack()) {
-                combat.triggerAttack();
+                // Déterminer la direction de l'attaque basée sur la vélocité actuelle
+                VelocityComponent vel = vm.get(entity);
+                float dirX = 1f;
+                float dirY = 0f;
+                if (vel != null) {
+                    float len = (float) Math.sqrt(vel.vx * vel.vx + vel.vy * vel.vy);
+                    if (len > 0.1f) {
+                        dirX = vel.vx / len;
+                        dirY = vel.vy / len;
+                    }
+                }
+                combat.triggerAttack(dirX, dirY);
             }
         }
     }
