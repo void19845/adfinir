@@ -64,31 +64,46 @@ public class RenderSystem extends IteratingSystem {
                 case RECTANGLE:
                     // Lance : rectangle long et étroit orienté vers la direction d'attaque
                     float halfW = weapon.width / 2f;
-                    float halfL = weapon.range / 2f;
+                    float length = weapon.range;
 
-                    // On centre le rectangle sur le joueur mais on le décale légèrement vers l'avant
-                    float centerX = pos.x + dx * (weapon.range / 2f);
-                    float centerY = pos.y + dy * (weapon.range / 2f);
-
+                    // On place le rectangle devant le joueur
                     if (Math.abs(dx) > Math.abs(dy)) {
                         shapeRenderer.rect(
-                            centerX - (dx > 0 ? weapon.range/2f : 0),
-                            centerY - halfW,
-                            weapon.range,
+                            pos.x + (dx > 0 ? 0 : -length),
+                            pos.y - halfW,
+                            length,
                             weapon.width
                         );
                     } else {
                         shapeRenderer.rect(
-                            centerX - halfW,
-                            centerY - (dy > 0 ? weapon.range/2f : 0),
+                            pos.x - halfW,
+                            pos.y + (dy > 0 ? 0 : -length),
                             weapon.width,
-                            weapon.range
+                            length
                         );
                     }
                     break;
                 case ARC:
-                    // Hache : cercle pour représenter la portée de l'arc
-                    shapeRenderer.circle(pos.x, pos.y, weapon.range / 2f);
+                    // Hache : On simule un arc par un rectangle large et court
+                    // décalé dans la direction de l'attaque.
+                    float arcWidth = weapon.range * 1.5f;
+                    float arcDepth = weapon.range * 0.5f;
+
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        shapeRenderer.rect(
+                            pos.x + (dx > 0 ? 0 : -arcWidth),
+                            pos.y - arcDepth / 2f,
+                            arcWidth,
+                            arcDepth
+                        );
+                    } else {
+                        shapeRenderer.rect(
+                            pos.x - arcWidth / 2f,
+                            pos.y + (dy > 0 ? 0 : -arcDepth),
+                            arcWidth,
+                            arcDepth
+                        );
+                    }
                     break;
             }
         }
