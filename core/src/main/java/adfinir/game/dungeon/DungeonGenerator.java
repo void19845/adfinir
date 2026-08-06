@@ -18,12 +18,9 @@ public class DungeonGenerator {
     // ---------------------------------------------------------------
     // Paramètres de génération
     // ---------------------------------------------------------------
-    private static final int MIN_PARTITION_SIZE = 10;  // tiles (agrandi pour absorber les couloirs larges)
+    private static final int MIN_PARTITION_SIZE = 8;   // tiles
     private static final int MIN_ROOM_SIZE      = 4;   // tiles
-    private static final int ROOM_PADDING       = 2;   // espace entre salle et bord de partition
-    private static final int CORRIDOR_WIDTH     = 2;   // largeur des couloirs en tiles
-    /** Espace minimum (en murs) entre deux couloirs parallèles. */
-    private static final int CORRIDOR_SPACING   = 1;
+    private static final int ROOM_PADDING       = 1;   // espace entre salle et bord de partition
 
     private final int cols;
     private final int rows;
@@ -61,25 +58,18 @@ public class DungeonGenerator {
         split(root, 0);
         buildRooms(root);
         connectPartitions(root);
-        enforceCorridorSpacing();
 
-        // Collecte toutes les salles et les trie par surface croissante
-        List<Room> allRooms = new ArrayList<>();
-        collectRooms(root, allRooms);
-        allRooms.sort((a, b) -> Integer.compare(a.area(), b.area()));
+        // Spawn = centre de la première feuille trouvée
+        Partition firstLeaf = getFirstLeaf(root);
+        if (firstLeaf != null && firstLeaf.room != null) {
+            spawnCol = firstLeaf.room.cx();
+            spawnRow = firstLeaf.room.cy();
+        } else {
+            spawnCol = cols / 2;
+            spawnRow = rows / 2;
+        }
 
-        // Spawn = centre de la plus petite salle
-        Room spawnRoom = allRooms.get(0);
-        spawnCol = spawnRoom.cx();
-        spawnRow = spawnRoom.cy();
-
-        // Exit = centre de la plus grande salle, marquée TILE_EXIT
-        Room exitRoom = allRooms.get(allRooms.size() - 1);
-        int exitCol = exitRoom.cx();
-        int exitRow = exitRoom.cy();
-        grid[exitRow][exitCol] = DungeonMap.TILE_EXIT;
-
-        return new DungeonMap(grid, spawnCol, spawnRow, exitCol, exitRow);
+        return new DungeonMap(grid, spawnCol, spawnRow);
     }
 
     public int getSpawnCol() { return spawnCol; }
@@ -179,31 +169,18 @@ public class DungeonGenerator {
     }
 
     /**
-     * Couloir en L entre deux centres de salles.
-     * On aligne sur le bord supérieur/gauche du couloir pour que la largeur
-     * s'étende toujours "vers le bas" ou "vers la droite".
+     * Couloir en L : horizontal puis vertical (ou l'inverse selon le RNG).
      */
     private void carveCorridor(int x1, int y1, int x2, int y2) {
-        // Décale d'un demi-couloir pour centrer visuellement sur le point de départ
-        int ox = -(CORRIDOR_WIDTH / 2);
-        int oy = -(CORRIDOR_WIDTH / 2);
-
         if (rng.nextBoolean()) {
-            // Horizontal d'abord, puis vertical
-            carveHCorridor(x1 + ox, x2 + ox, y1 + oy);
-            carveVCorridor(y1 + oy, y2 + oy, x2 + ox);
+            carveHCorridor(x1, x2, y1);
+            carveVCorridor(y1, y2, x2);
         } else {
-            // Vertical d'abord, puis horizontal
-            carveVCorridor(y1 + oy, y2 + oy, x1 + ox);
-            carveHCorridor(x1 + ox, x2 + ox, y2 + oy);
+            carveVCorridor(y1, y2, x1);
+            carveHCorridor(x1, x2, y2);
         }
     }
 
-    /**
-     * Couloir horizontal de largeur CORRIDOR_WIDTH.
-     * Creuse de (from, y) à (to, y+CORRIDOR_WIDTH-1).
-     * Le paramètre y est le bord supérieur du couloir.
-     */
     private void carveHCorridor(int x1, int x2, int y) {
         int from = Math.min(x1, x2);
         int to   = Math.max(x1, x2);
@@ -215,11 +192,6 @@ public class DungeonGenerator {
             }
     }
 
-    /**
-     * Couloir vertical de largeur CORRIDOR_WIDTH.
-     * Creuse de (x, from) à (x+CORRIDOR_WIDTH-1, to).
-     * Le paramètre x est le bord gauche du couloir.
-     */
     private void carveVCorridor(int y1, int y2, int x) {
         int from = Math.min(y1, y2);
         int to   = Math.max(y1, y2);
@@ -302,15 +274,11 @@ public class DungeonGenerator {
         return (r != null) ? r : getAnyRoom(p.right);
     }
 
-    /** Collecte récursivement toutes les salles des feuilles dans la liste. */
-    private void collectRooms(Partition p, List<Room> out) {
-        if (p == null) return;
-        if (p.isLeaf()) {
-            if (p.room != null) out.add(p.room);
-            return;
-        }
-        collectRooms(p.left,  out);
-        collectRooms(p.right, out);
+    private Partition getFirstLeaf(Partition p) {
+        if (p == null) return null;
+        if (p.isLeaf()) return p;
+        Partition l = getFirstLeaf(p.left);
+        return (l != null) ? l : getFirstLeaf(p.right);
     }
 
     // ---------------------------------------------------------------
@@ -340,6 +308,5 @@ public class DungeonGenerator {
 
         int cx() { return x + w / 2; }
         int cy() { return y + h / 2; }
-        int area() { return w * h; }
     }
 }

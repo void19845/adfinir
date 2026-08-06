@@ -52,15 +52,8 @@ public class DungeonRenderer {
                         sr.setColor(COLOR_WALL);
                         sr.rect(px, py, ts, ts);
                         break;
-                    case DungeonMap.TILE_EXIT:
-                        // Fond de sol + carré vert centré
-                        sr.setColor(COLOR_FLOOR);
-                        sr.rect(px, py, ts, ts);
-                        sr.setColor(COLOR_EXIT);
-                        float margin = ts * 0.2f;
-                        sr.rect(px + margin, py + margin, ts - margin * 2, ts - margin * 2);
-                        break;
                     default:
+                        // TILE_EMPTY : fond noir, rien à dessiner
                         break;
                 }
             }

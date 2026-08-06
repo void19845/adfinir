@@ -25,30 +25,30 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
-import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
 
 public class GameScreen implements Screen {
 
-    // Taille de vue de base — ExtendViewport agrandit cette zone
-    // pour remplir l'écran sans étirement ni bandes noires
+    // Taille de la vue en pixels (espace monde)
     private static final int VIEW_W = 320;
     private static final int VIEW_H = 240;
 
     private final Main game;
 
-    private ExtendViewport      viewport;
-    private OrthographicCamera  camera;
-    private ShapeRenderer       shapeRenderer;
+    // Rendu
+    private FitViewport     viewport;
+    private OrthographicCamera camera;
+    private ShapeRenderer   shapeRenderer;
 
+    // Donjon
     private DungeonMap      dungeonMap;
     private DungeonRenderer dungeonRenderer;
 
-    private Engine               engine;
-    private Entity               player;
-    private TransformComponent   playerTransform;
-    private PlayerStatsComponent playerStats;
+    // ECS Ashley
+    private Engine          engine;
+    private Entity          player;
+    private TransformComponent playerTransform;
 
-    private StatsOverlay statsOverlay;
     private int currentLevel = 1;
 
     public GameScreen(Main game) {
@@ -57,104 +57,103 @@ public class GameScreen implements Screen {
 
     @Override
     public void show() {
+        // --- Caméra & viewport ---
         camera   = new OrthographicCamera();
-        // ExtendViewport : garantit qu'on voit AU MOINS VIEW_W x VIEW_H
-        // et étend la vue pour couvrir le reste — pas de bandes noires, pas d'étirement
-        viewport = new ExtendViewport(VIEW_W, VIEW_H, camera);
+        viewport = new FitViewport(VIEW_W, VIEW_H, camera);
 
         shapeRenderer = new ShapeRenderer();
         shapeRenderer.setAutoShapeType(true);
 
+        // --- Donjon généré procéduralement ---
         DungeonGenerator generator = new DungeonGenerator(50, 40);
         dungeonMap      = generator.generate();
         dungeonRenderer = new DungeonRenderer(dungeonMap);
 
+        // --- ECS ---
         engine = new Engine();
-        engine.addSystem(new StatsSystem());
+
+        // Systèmes (ordre d'exécution via priorité dans le constructeur)
         engine.addSystem(new PlayerInputSystem());
         engine.addSystem(new MovementSystem(dungeonMap));
         engine.addSystem(new RenderSystem(shapeRenderer));
 
-        player          = new Entity();
+        // Entité joueur — on le place sur la première tile de sol disponible
+        player = new Entity();
         playerTransform = new TransformComponent();
         playerTransform.x = dungeonMap.getSpawnPixelX();
         playerTransform.y = dungeonMap.getSpawnPixelY();
 
-        VelocityComponent    playerVel   = new VelocityComponent();
-        RenderComponent      playerRender = new RenderComponent();
-        playerRender.color  = new Color(0.2f, 0.7f, 1.0f, 1f);
+        VelocityComponent playerVel = new VelocityComponent();
+
+        RenderComponent playerRender = new RenderComponent();
+        playerRender.color = new Color(0.2f, 0.7f, 1.0f, 1f); // bleu clair
         playerRender.width  = 12f;
         playerRender.height = 12f;
 
         PlayerInputComponent playerInput = new PlayerInputComponent();
         playerInput.speed = 80f;
 
-        playerStats = new PlayerStatsComponent();
-
         player.add(playerTransform);
         player.add(playerVel);
         player.add(playerRender);
         player.add(playerInput);
-        player.add(playerStats);
         engine.addEntity(player);
-
-        statsOverlay = new StatsOverlay();
     }
 
     @Override
     public void render(float delta) {
+        // --- Échap = menu principal ---
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             game.setScreen(new MainMenuScreen(game));
             dispose();
             return;
         }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.K)) {
-            statsOverlay.toggle();
-        }
 
-        engine.getSystem(StatsSystem.class).update(delta);
+        // --- Mise à jour ECS (hors rendu) ---
+        // On met à jour manuellement les systèmes non-rendu d'abord
         engine.getSystem(PlayerInputSystem.class).update(delta);
         engine.getSystem(MovementSystem.class).update(delta);
 
-        // Clamp caméra en tenant compte de la vue étendue
-        float halfW = camera.viewportWidth  / 2f;
-        float halfH = camera.viewportHeight / 2f;
-        float camTargetX = MathUtils.clamp(playerTransform.x,
-            halfW,  dungeonMap.getPixelWidth()  - halfW);
-        float camTargetY = MathUtils.clamp(playerTransform.y,
-            halfH, dungeonMap.getPixelHeight() - halfH);
-
+        // --- Caméra suit le joueur (lerp doux) ---
+        float camTargetX = MathUtils.clamp(
+            playerTransform.x,
+            VIEW_W / 2f,
+            dungeonMap.getPixelWidth()  - VIEW_W / 2f
+        );
+        float camTargetY = MathUtils.clamp(
+            playerTransform.y,
+            VIEW_H / 2f,
+            dungeonMap.getPixelHeight() - VIEW_H / 2f
+        );
         camera.position.x += (camTargetX - camera.position.x) * 6f * delta;
         camera.position.y += (camTargetY - camera.position.y) * 6f * delta;
         camera.update();
 
+        // --- Rendu ---
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-        viewport.apply();
 
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
+        // Viewport pour le culling
         Rectangle viewRect = new Rectangle(
-            camera.position.x - camera.viewportWidth  / 2f,
-            camera.position.y - camera.viewportHeight / 2f,
-            camera.viewportWidth,
-            camera.viewportHeight
+            camera.position.x - VIEW_W / 2f,
+            camera.position.y - VIEW_H / 2f,
+            VIEW_W,
+            VIEW_H
         );
         dungeonRenderer.render(shapeRenderer, viewRect);
+
+        // Rendu des entités (RenderSystem utilise le shapeRenderer déjà ouvert)
         engine.getSystem(RenderSystem.class).update(delta);
 
         shapeRenderer.end();
-
-        statsOverlay.update(playerStats, delta);
-        statsOverlay.draw();
     }
 
     @Override
     public void resize(int w, int h) {
         viewport.update(w, h, true);
-        statsOverlay.resize(w, h);
     }
 
     @Override public void pause()  {}
@@ -164,6 +163,5 @@ public class GameScreen implements Screen {
     @Override
     public void dispose() {
         shapeRenderer.dispose();
-        statsOverlay.dispose();
     }
 }
