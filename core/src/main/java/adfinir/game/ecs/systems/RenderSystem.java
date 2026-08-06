@@ -84,8 +84,6 @@ public class RenderSystem extends IteratingSystem {
                     }
                     break;
                 case ARC:
-                    // Hache : On simule un arc par un rectangle large et court
-                    // décalé dans la direction de l'attaque.
                     float arcWidth = weapon.range * 1.5f;
                     float arcDepth = weapon.range * 0.5f;
 
