@@ -1,8 +1,12 @@
 package adfinir.game.ecs.systems;
 
 import adfinir.game.ecs.components.CombatComponent;
+import adfinir.game.ecs.components.InventoryComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.VelocityComponent;
+import adfinir.game.inventory.ItemGenerator;
+import adfinir.game.inventory.Weapon;
+import adfinir.game.inventory.WeaponType;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
@@ -15,6 +19,7 @@ public class PlayerInputSystem extends IteratingSystem {
     private final ComponentMapper<VelocityComponent>    vm = ComponentMapper.getFor(VelocityComponent.class);
     private final ComponentMapper<PlayerInputComponent> pm = ComponentMapper.getFor(PlayerInputComponent.class);
     private final ComponentMapper<CombatComponent>      cm = ComponentMapper.getFor(CombatComponent.class);
+    private final ComponentMapper<InventoryComponent>   im = ComponentMapper.getFor(InventoryComponent.class);
 
     public PlayerInputSystem() {
         super(Family.all(PlayerInputComponent.class, VelocityComponent.class).get(), 1);
@@ -54,19 +59,27 @@ public class PlayerInputSystem extends IteratingSystem {
             }
         }
 
-        // Switch arme : Touche X (pour test)
+        // Switch arme : Touche X
         if (Gdx.input.isKeyJustPressed(Input.Keys.X)) {
-            CombatComponent combat = cm.get(entity);
-            if (combat != null) {
-                if (combat.weapon == null || combat.weapon.name.contains("Épée")) {
-                    combat.weapon = adfinir.game.player.Weapon.createAxe();
-                    Gdx.app.log("Input", "Weapon switched to: Axe");
-                } else if (combat.weapon.name.contains("Hache")) {
-                    combat.weapon = adfinir.game.player.Weapon.createLance();
-                    Gdx.app.log("Input", "Weapon switched to: Lance");
-                } else {
-                    combat.weapon = adfinir.game.player.Weapon.createSword();
-                    Gdx.app.log("Input", "Weapon switched to: Sword");
+            InventoryComponent inv = im.get(entity);
+            if (inv != null) {
+                // Cycle : SWORD -> SPEAR -> CLAYMORE -> SWORD
+                WeaponType currentType = (inv.weapon != null) ? inv.weapon.type : WeaponType.SWORD;
+                WeaponType nextType;
+                switch (currentType) {
+                    case SWORD:    nextType = WeaponType.SPEAR; break;
+                    case SPEAR:    nextType = WeaponType.CLAYMORE; break;
+                    case CLAYMORE: nextType = WeaponType.SWORD; break;
+                    default:       nextType = WeaponType.SWORD; break;
+                }
+
+                inv.equipWeapon(ItemGenerator.createWeaponOfType(nextType));
+                Gdx.app.log("Input", "Weapon switched to: " + nextType.name());
+
+                // Synchronise le CombatComponent
+                CombatComponent combat = cm.get(entity);
+                if (combat != null) {
+                    combat.weapon = inv.weapon;
                 }
             }
         }

@@ -11,15 +11,15 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
-import java.util.List;
 
-/**
- * Système gérant le mouvement intelligent des ennemis.
- */
 public class EnemyMovementSystem extends IteratingSystem {
     private final ComponentMapper<EnemyAIComponent> aiMapper = ComponentMapper.getFor(EnemyAIComponent.class);
     private final ComponentMapper<VelocityComponent> velMapper = ComponentMapper.getFor(VelocityComponent.class);
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper.getFor(TransformComponent.class);
+
+    private static final int MAX_RANDOM_TRIES = 8;
+    // Distance de "sondage" devant l'ennemi pour valider la direction (en pixels)
+    private static final float LOOKAHEAD = 20f;
 
     private final DungeonMap map;
     private Entity player;
@@ -40,20 +40,17 @@ public class EnemyMovementSystem extends IteratingSystem {
         TransformComponent playerPos = transformMapper.get(player);
         if (playerPos == null) return;
 
-        // Calcul distance au joueur
         float dx = playerPos.x - pos.x;
         float dy = playerPos.y - pos.y;
         float dist = (float) Math.sqrt(dx * dx + dy * dy);
 
-        // Gestion des états de l'IA
         if (dist < ai.detectionRange) {
             ai.state = EnemyAIComponent.State.PURSUING;
-        } else if (dist > ai.detectionRange * 1.2f) { // Hystérésis pour éviter le clignotement d'état
+        } else if (dist > ai.detectionRange * 1.2f) {
             ai.state = EnemyAIComponent.State.IDLE;
         }
 
         if (ai.state == EnemyAIComponent.State.PURSUING) {
-            // Poursuite intelligente via BFS
             Vector2 nextStep = Pathfinding.findNextStep(map,
                 new Vector2(pos.x, pos.y),
                 new Vector2(playerPos.x, playerPos.y)
@@ -68,20 +65,49 @@ public class EnemyMovementSystem extends IteratingSystem {
                     vel.vy = (dirY / len) * ai.pursuitSpeed;
                 }
             } else {
-                // Si aucun chemin, on s'arrête ou on tente un mouvement aléatoire
                 vel.vx = 0;
                 vel.vy = 0;
             }
         } else {
-            // Marche aléatoire (IDLE)
+            // Marche aléatoire (IDLE) — ne choisit plus une direction menant dans un mur
             ai.changeDirectionTimer -= deltaTime;
             if (ai.changeDirectionTimer <= 0f) {
-                float angle = MathUtils.random(0, 360);
-                float rad = (float) Math.toRadians(angle);
-                vel.vx = (float) Math.cos(rad) * ai.speed;
-                vel.vy = (float) Math.sin(rad) * ai.speed;
+                boolean found = false;
+
+                for (int i = 0; i < MAX_RANDOM_TRIES; i++) {
+                    float angle = MathUtils.random(0, 360);
+                    float rad = (float) Math.toRadians(angle);
+                    float dirX = (float) Math.cos(rad);
+                    float dirY = (float) Math.sin(rad);
+
+                    if (isWalkable(pos.x + dirX * LOOKAHEAD, pos.y + dirY * LOOKAHEAD)) {
+                        vel.vx = dirX * ai.speed;
+                        vel.vy = dirY * ai.speed;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    // Aucune direction libre trouvée (coin/impasse) : on reste immobile
+                    // et on retente vite plutôt que d'attendre moveDuration entier
+                    vel.vx = 0;
+                    vel.vy = 0;
+                    ai.changeDirectionTimer = 0.2f;
+                    return;
+                }
+
                 ai.changeDirectionTimer = ai.moveDuration;
             }
         }
+    }
+
+    /** Vérifie que la case pixel (x,y) est dans les limites et n'est pas un mur. */
+    private boolean isWalkable(float x, float y) {
+        int col = (int) (x / DungeonMap.TILE_SIZE);
+        int row = (int) (y / DungeonMap.TILE_SIZE);
+
+        if (col < 0 || col >= map.cols || row < 0 || row >= map.rows) return false;
+        return map.getTile(col, row) != DungeonMap.TILE_WALL;
     }
 }

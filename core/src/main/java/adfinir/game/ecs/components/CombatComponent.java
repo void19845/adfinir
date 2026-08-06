@@ -1,6 +1,6 @@
 package adfinir.game.ecs.components;
 
-import adfinir.game.player.Weapon;
+import adfinir.game.inventory.Weapon;
 import com.badlogic.ashley.core.Component;
 
 /**
@@ -19,6 +19,7 @@ public class CombatComponent implements Component {
     public float timer = 0f;            // Timer de cooldown
     public boolean isAttacking = false; // True si l'entité est en train de frapper
     public boolean hasHit = false;      // True si l'attaque a déjà touché quelqu'un
+    public int comboIndex = 0;          // Indice de l'attaque actuelle dans le combo
 
     public boolean canAttack() {
         return timer <= 0f && weapon != null;
@@ -29,7 +30,12 @@ public class CombatComponent implements Component {
         this.attackDirX = dirX;
         this.attackDirY = dirY;
         isAttacking = true;
+
+        // Utilise le cooldown de l'attaque actuelle du combo
+        timer = weapon.getModifiedCooldown(comboIndex);
+
+        // Passe à l'attaque suivante pour le prochain coup
+        comboIndex = (comboIndex + 1) % weapon.comboSlots.size();
         hasHit = false; // Reset hit for new attack
-        timer = weapon.cooldown;
-    }
+        }
 }

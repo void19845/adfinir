@@ -4,8 +4,9 @@ import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.EnemyStatsComponent;
 import adfinir.game.ecs.components.RenderComponent;
 import adfinir.game.ecs.components.TransformComponent;
+import adfinir.game.inventory.Weapon;
+import adfinir.game.inventory.WeaponSpriteManager;
 import adfinir.game.player.AttackShape;
-import adfinir.game.player.Weapon;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
@@ -57,7 +58,13 @@ public class RenderSystem extends IteratingSystem {
             float dx = combat.attackDirX;
             float dy = combat.attackDirY;
 
-            switch (weapon.shape) {
+            // On utilise le type d'arme pour la forme et l'attaque actuelle pour la taille
+            adfinir.game.player.AttackShape shape = weapon.type.shape;
+            float range = (combat.comboIndex < weapon.comboSlots.size())
+                ? weapon.comboSlots.get(combat.comboIndex).areaOfEffect * weapon.type.rangeMod
+                : 30f;
+
+            switch (shape) {
                 case CONE:
                     // Épée : On utilise l'arc de ShapeRenderer pour créer un cône (wedge)
                     float angle = 60f; // Largeur du cône en degrés
@@ -66,36 +73,36 @@ public class RenderSystem extends IteratingSystem {
 
                     shapeRenderer.arc(
                         pos.x, pos.y,
-                        weapon.range / 2f,
+                        range / 2f,
                         startAngle,
                         angle
                     );
                     break;
                 case RECTANGLE:
                     // Lance : rectangle long et étroit orienté vers la direction d'attaque
-                    float halfW = weapon.width / 2f;
-                    float length = weapon.range;
+                    float halfW = 15f;
+                    float length = range;
 
                     if (Math.abs(dx) > Math.abs(dy)) {
                         shapeRenderer.rect(
                             pos.x + (dx > 0 ? 0 : -length),
                             pos.y - halfW,
                             length,
-                            weapon.width
+                            halfW * 2f
                         );
                     } else {
                         shapeRenderer.rect(
                             pos.x - halfW,
                             pos.y + (dy > 0 ? 0 : -length),
-                            weapon.width,
+                            halfW * 2f,
                             length
                         );
                     }
                     break;
                 case ARC:
                     // Hache : On simule un arc par un rectangle large et court
-                    float arcWidth = weapon.range * 1.5f;
-                    float arcDepth = weapon.range;
+                    float arcWidth = range * 1.5f;
+                    float arcDepth = range;
 
                     if (Math.abs(dx) > Math.abs(dy)) {
                         shapeRenderer.rect(

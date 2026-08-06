@@ -4,9 +4,6 @@ import adfinir.game.dungeon.DungeonMap;
 import com.badlogic.gdx.math.Vector2;
 import java.util.*;
 
-/**
- * Utilitaire pour trouver un chemin sur la grille du donjon.
- */
 public class Pathfinding {
     public static Vector2 findNextStep(DungeonMap map, Vector2 start, Vector2 target) {
         int startCol = (int) (start.x / DungeonMap.TILE_SIZE);
@@ -16,14 +13,17 @@ public class Pathfinding {
 
         if (startCol == targetCol && startRow == targetRow) return null;
 
-        // BFS pour trouver le chemin le plus court vers la tile cible
         Queue<int[]> queue = new LinkedList<>();
         Map<String, int[]> parent = new HashMap<>();
 
         queue.add(new int[]{startCol, startRow});
         parent.put(startCol + "," + startRow, null);
 
-        int[][] dirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+        // Cardinales + diagonales
+        int[][] dirs = {
+            {0, 1}, {0, -1}, {1, 0}, {-1, 0},
+            {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+        };
 
         while (!queue.isEmpty()) {
             int[] curr = queue.poll();
@@ -31,13 +31,6 @@ public class Pathfinding {
             int r = curr[1];
 
             if (c == targetCol && r == targetRow) {
-                // On a trouvé la cible, on remonte le chemin pour trouver la première étape
-                int[] step = curr;
-                while (parent.get(step[0] + "," + step[1]) != null) {
-                    // On ne veut pas remonter jusqu'au départ, mais juste à l'étape suivante
-                    // On va stocker le chemin et prendre le premier élément
-                }
-                // Correction : on reconstruit le chemin complet
                 List<int[]> path = new ArrayList<>();
                 int[] temp = curr;
                 while (temp != null) {
@@ -46,7 +39,6 @@ public class Pathfinding {
                 }
                 Collections.reverse(path);
 
-                // Le premier élément est le départ, le deuxième est la première étape
                 if (path.size() > 1) {
                     int[] next = path.get(1);
                     return new Vector2(
@@ -62,12 +54,21 @@ public class Pathfinding {
                 int nr = r + d[1];
                 String key = nc + "," + nr;
 
-                if (nc >= 0 && nc < map.cols && nr >= 0 && nr < map.rows
-                    && map.getTile(nc, nr) != DungeonMap.TILE_WALL
-                    && !parent.containsKey(key)) {
-                    parent.put(key, curr);
-                    queue.add(new int[]{nc, nr});
+                if (nc < 0 || nc >= map.cols || nr < 0 || nr >= map.rows) continue;
+                if (map.getTile(nc, nr) == DungeonMap.TILE_WALL) continue;
+                if (parent.containsKey(key)) continue;
+
+                // Anti-corner-cutting : en diagonale, les deux cases adjacentes
+                // (horizontale + verticale) doivent aussi être libres
+                boolean isDiagonal = d[0] != 0 && d[1] != 0;
+                if (isDiagonal) {
+                    boolean sideBlocked = map.getTile(c + d[0], r) == DungeonMap.TILE_WALL
+                        || map.getTile(c, r + d[1]) == DungeonMap.TILE_WALL;
+                    if (sideBlocked) continue;
                 }
+
+                parent.put(key, curr);
+                queue.add(new int[]{nc, nr});
             }
         }
 

@@ -19,8 +19,12 @@ import adfinir.game.ecs.systems.MovementSystem;
 import adfinir.game.ecs.systems.PlayerInputSystem;
 import adfinir.game.ecs.systems.RenderSystem;
 import adfinir.game.ecs.systems.StatsSystem;
-import adfinir.game.player.Weapon;
+import adfinir.game.inventory.ItemGenerator;
+import adfinir.game.ecs.components.InventoryComponent;
+import adfinir.game.inventory.Weapon;
+
 import adfinir.game.ui.MiniMap;
+import adfinir.game.ui.InventoryOverlay;
 import adfinir.game.ui.StatsOverlay;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
@@ -57,6 +61,7 @@ public class GameScreen implements Screen {
     private PlayerStatsComponent playerStats;
 
     private StatsOverlay statsOverlay;
+    private InventoryOverlay inventoryOverlay;
     private MiniMap      miniMap;
     private OrthographicCamera uiCamera;
     private int screenW, screenH;
@@ -104,7 +109,17 @@ public class GameScreen implements Screen {
 
         playerStats = new PlayerStatsComponent();
         CombatComponent playerCombat = new CombatComponent();
-        playerCombat.weapon = Weapon.createSword(); // Equip une épée par défaut
+
+        InventoryComponent inventory = new InventoryComponent();
+        inventory.equipWeapon(ItemGenerator.generateWeapon());
+        inventory.equipArmor(ItemGenerator.generateArmor());
+        inventory.equipCapacity(ItemGenerator.generateCapacity());
+        inventory.equipArtifact(ItemGenerator.generateArtifact());
+
+        // Synchronise les stats de départ avec l'équipement généré
+        inventory.updateStats(playerStats.stats);
+
+        playerCombat.weapon = inventory.weapon;
 
         player.add(playerTransform);
         player.add(playerVel);
@@ -112,6 +127,7 @@ public class GameScreen implements Screen {
         player.add(playerInput);
         player.add(playerStats);
         player.add(playerCombat);
+        player.add(inventory);
         engine.addEntity(player);
 
         // MAINTENANT on ajoute le système de mouvement ennemi avec le joueur initialisé
@@ -124,6 +140,7 @@ public class GameScreen implements Screen {
         }
 
         statsOverlay = new StatsOverlay();
+        inventoryOverlay = new InventoryOverlay();
         miniMap      = new MiniMap();
         uiCamera     = new OrthographicCamera();
     }
@@ -172,11 +189,18 @@ public class GameScreen implements Screen {
         if (Gdx.input.isKeyJustPressed(Input.Keys.K)) {
             statsOverlay.toggle();
         }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            inventoryOverlay.toggle();
+        }
 
-        engine.getSystem(StatsSystem.class).update(delta);
-        engine.getSystem(CombatSystem.class).update(delta);
-        engine.getSystem(PlayerInputSystem.class).update(delta);
-        engine.getSystem(MovementSystem.class).update(delta);
+        if (!inventoryOverlay.isVisible()) {
+            engine.getSystem(StatsSystem.class).update(delta);
+            engine.getSystem(CombatSystem.class).update(delta);
+            engine.getSystem(PlayerInputSystem.class).update(delta);
+            engine.getSystem(EnemyMovementSystem.class).update(delta);
+            engine.getSystem(MovementSystem.class).update(delta);
+            engine.getSystem(DeathSystem.class).update(delta);
+        }
 
         // Clamp caméra en tenant compte de la vue étendue
         float halfW = camera.viewportWidth  / 2f;
@@ -197,7 +221,6 @@ public class GameScreen implements Screen {
 
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-
         Rectangle viewRect = new Rectangle(
             camera.position.x - camera.viewportWidth  / 2f,
             camera.position.y - camera.viewportHeight / 2f,
@@ -206,8 +229,10 @@ public class GameScreen implements Screen {
         );
         dungeonRenderer.render(shapeRenderer, viewRect);
         engine.getSystem(RenderSystem.class).update(delta);
-
         shapeRenderer.end();
+
+        inventoryOverlay.update(player.getComponent(InventoryComponent.class));
+        inventoryOverlay.draw();
 
         shapeRenderer.setProjectionMatrix(uiCamera.combined);
         miniMap.draw(shapeRenderer, dungeonMap, playerTransform, screenW, screenH);
@@ -222,6 +247,7 @@ public class GameScreen implements Screen {
         screenH = h;
         viewport.update(w, h, true);
         statsOverlay.resize(w, h);
+        inventoryOverlay.resize(w, h);
         uiCamera.viewportWidth = w;
         uiCamera.viewportHeight = h;
         uiCamera.position.set(w / 2f, h / 2f, 0);
@@ -236,5 +262,6 @@ public class GameScreen implements Screen {
     public void dispose() {
         shapeRenderer.dispose();
         statsOverlay.dispose();
+        inventoryOverlay.dispose();
     }
 }

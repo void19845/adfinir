@@ -4,7 +4,8 @@ import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.EnemyStatsComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
 import adfinir.game.ecs.components.TransformComponent;
-import adfinir.game.player.Weapon;
+import adfinir.game.inventory.Weapon;
+import adfinir.game.inventory.WeaponAttack;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
@@ -33,43 +34,13 @@ public class CombatSystem extends IteratingSystem {
             combat.timer -= deltaTime;
         }
 
-        // Gestion de la durée de l'attaque et détection de collision
+        // Gestion de la durée de l'attaque (hitbox active)
         if (combat.isAttacking) {
-            if (combat.timer < weapon.cooldown - weapon.duration) {
+            // L'attaque est active tant que le timer est proche du cooldown max
+            // On considère l'attaque active pendant la durée spécifiée par l'attaque actuelle du combo
+            WeaponAttack currentAttack = weapon.comboSlots.get(combat.comboIndex);
+            if (combat.timer < currentAttack.cooldown - currentAttack.duration) {
                 combat.isAttacking = false;
-            } else if (!combat.hasHit) {
-                // Tentative de frapper d'autres entités
-                checkHit(entity, combat, weapon);
-            }
-        }
-    }
-
-    private void checkHit(Entity attacker, CombatComponent combat, Weapon weapon) {
-        TransformComponent attackerPos = transformMapper.get(attacker);
-
-        // On parcourt toutes les entités du moteur pour voir lesquelles sont touchées
-        for (Entity target : getEngine().getEntities()) {
-            if (target == attacker) continue;
-
-            TransformComponent targetPos = transformMapper.get(target);
-            if (targetPos == null) continue;
-
-            // Calcul de la distance
-            float dx = targetPos.x - attackerPos.x;
-            float dy = targetPos.y - attackerPos.y;
-            float distSq = dx * dx + dy * dy;
-
-            // Pour simplifier, on utilise un cercle basé sur le range de l'arme
-            // On vérifie aussi si la cible est globalement dans la direction de l'attaque
-            float range = weapon.range;
-            if (distSq <= range * range) {
-                // Vérification directionnelle simplifiée (produit scalaire)
-                float dot = dx * combat.attackDirX + dy * combat.attackDirY;
-                if (dot > 0) { // La cible est devant l'attaquant
-                    applyDamage(attacker, target, weapon.damage);
-                    combat.hasHit = true;
-                    break; // On ne frappe qu'une cible par attaque pour l'instant
-                }
             }
         }
     }
