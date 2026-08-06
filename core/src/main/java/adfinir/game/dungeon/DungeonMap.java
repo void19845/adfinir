@@ -13,6 +13,7 @@ public class DungeonMap {
     public static final int TILE_EMPTY = 0;
     public static final int TILE_WALL  = 1;
     public static final int TILE_FLOOR = 2;
+    public static final int TILE_EXIT  = 3; // portail vers le niveau suivant
 
     public static final int TILE_SIZE = 16; // pixels par tile
 
@@ -21,19 +22,28 @@ public class DungeonMap {
     public final int rows;
     public final int spawnCol;
     public final int spawnRow;
+    public final int exitCol;
+    public final int exitRow;
 
-    /** Constructeur utilisé par DungeonGenerator (avec spawn). */
-    public DungeonMap(int[][] grid, int spawnCol, int spawnRow) {
+    /** Constructeur utilisé par DungeonGenerator (avec spawn et exit). */
+    public DungeonMap(int[][] grid, int spawnCol, int spawnRow, int exitCol, int exitRow) {
         this.grid     = grid;
         this.rows     = grid.length;
         this.cols     = (rows > 0) ? grid[0].length : 0;
         this.spawnCol = spawnCol;
         this.spawnRow = spawnRow;
+        this.exitCol  = exitCol;
+        this.exitRow  = exitRow;
+    }
+
+    /** Constructeur legacy pour les cartes statiques. */
+    public DungeonMap(int[][] grid, int spawnCol, int spawnRow) {
+        this(grid, spawnCol, spawnRow, grid[0].length / 2, grid.length / 2);
     }
 
     /** Constructeur pour les cartes statiques. */
     public DungeonMap(int[][] grid) {
-        this(grid, (grid[0].length / 2), (grid.length / 2));
+        this(grid, grid[0].length / 2, grid.length / 2);
     }
 
     /** Retourne le type de tile à la position grille (col, row). */

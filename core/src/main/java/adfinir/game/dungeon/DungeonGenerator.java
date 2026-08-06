@@ -18,9 +18,12 @@ public class DungeonGenerator {
     // ---------------------------------------------------------------
     // Paramètres de génération
     // ---------------------------------------------------------------
-    private static final int MIN_PARTITION_SIZE = 8;   // tiles
+    private static final int MIN_PARTITION_SIZE = 10;  // tiles (agrandi pour absorber les couloirs larges)
     private static final int MIN_ROOM_SIZE      = 4;   // tiles
-    private static final int ROOM_PADDING       = 1;   // espace entre salle et bord de partition
+    private static final int ROOM_PADDING       = 2;   // espace entre salle et bord de partition
+    private static final int CORRIDOR_WIDTH     = 2;   // largeur des couloirs en tiles
+    /** Espace minimum (en murs) entre deux couloirs parallèles. */
+    private static final int CORRIDOR_SPACING   = 1;
 
     private final int cols;
     private final int rows;
@@ -58,18 +61,25 @@ public class DungeonGenerator {
         split(root, 0);
         buildRooms(root);
         connectPartitions(root);
+        enforceCorridorSpacing();
 
-        // Spawn = centre de la première feuille trouvée
-        Partition firstLeaf = getFirstLeaf(root);
-        if (firstLeaf != null && firstLeaf.room != null) {
-            spawnCol = firstLeaf.room.cx();
-            spawnRow = firstLeaf.room.cy();
-        } else {
-            spawnCol = cols / 2;
-            spawnRow = rows / 2;
-        }
+        // Collecte toutes les salles et les trie par surface croissante
+        List<Room> allRooms = new ArrayList<>();
+        collectRooms(root, allRooms);
+        allRooms.sort((a, b) -> Integer.compare(a.area(), b.area()));
 
-        return new DungeonMap(grid, spawnCol, spawnRow);
+        // Spawn = centre de la plus petite salle
+        Room spawnRoom = allRooms.get(0);
+        spawnCol = spawnRoom.cx();
+        spawnRow = spawnRoom.cy();
+
+        // Exit = centre de la plus grande salle, marquée TILE_EXIT
+        Room exitRoom = allRooms.get(allRooms.size() - 1);
+        int exitCol = exitRoom.cx();
+        int exitRow = exitRoom.cy();
+        grid[exitRow][exitCol] = DungeonMap.TILE_EXIT;
+
+        return new DungeonMap(grid, spawnCol, spawnRow, exitCol, exitRow);
     }
 
     public int getSpawnCol() { return spawnCol; }
@@ -169,32 +179,116 @@ public class DungeonGenerator {
     }
 
     /**
-     * Couloir en L : horizontal puis vertical (ou l'inverse selon le RNG).
+     * Couloir en L entre deux centres de salles.
+     * On aligne sur le bord supérieur/gauche du couloir pour que la largeur
+     * s'étende toujours "vers le bas" ou "vers la droite".
      */
     private void carveCorridor(int x1, int y1, int x2, int y2) {
+        // Décale d'un demi-couloir pour centrer visuellement sur le point de départ
+        int ox = -(CORRIDOR_WIDTH / 2);
+        int oy = -(CORRIDOR_WIDTH / 2);
+
         if (rng.nextBoolean()) {
-            carveHCorridor(x1, x2, y1);
-            carveVCorridor(y1, y2, x2);
+            // Horizontal d'abord, puis vertical
+            carveHCorridor(x1 + ox, x2 + ox, y1 + oy);
+            carveVCorridor(y1 + oy, y2 + oy, x2 + ox);
         } else {
-            carveVCorridor(y1, y2, x1);
-            carveHCorridor(x1, x2, y2);
+            // Vertical d'abord, puis horizontal
+            carveVCorridor(y1 + oy, y2 + oy, x1 + ox);
+            carveHCorridor(x1 + ox, x2 + ox, y2 + oy);
         }
     }
 
+    /**
+     * Couloir horizontal de largeur CORRIDOR_WIDTH.
+     * Creuse de (from, y) à (to, y+CORRIDOR_WIDTH-1).
+     * Le paramètre y est le bord supérieur du couloir.
+     */
     private void carveHCorridor(int x1, int x2, int y) {
         int from = Math.min(x1, x2);
         int to   = Math.max(x1, x2);
         for (int c = from; c <= to; c++)
-            if (c >= 0 && c < cols && y >= 0 && y < rows)
-                grid[y][c] = DungeonMap.TILE_FLOOR;
+            for (int t = 0; t < CORRIDOR_WIDTH; t++) {
+                int r = y + t;
+                if (c >= 0 && c < cols && r >= 0 && r < rows)
+                    grid[r][c] = DungeonMap.TILE_FLOOR;
+            }
     }
 
+    /**
+     * Couloir vertical de largeur CORRIDOR_WIDTH.
+     * Creuse de (x, from) à (x+CORRIDOR_WIDTH-1, to).
+     * Le paramètre x est le bord gauche du couloir.
+     */
     private void carveVCorridor(int y1, int y2, int x) {
         int from = Math.min(y1, y2);
         int to   = Math.max(y1, y2);
         for (int r = from; r <= to; r++)
-            if (r >= 0 && r < rows && x >= 0 && x < cols)
-                grid[r][x] = DungeonMap.TILE_FLOOR;
+            for (int t = 0; t < CORRIDOR_WIDTH; t++) {
+                int c = x + t;
+                if (r >= 0 && r < rows && c >= 0 && c < cols)
+                    grid[r][c] = DungeonMap.TILE_FLOOR;
+            }
+    }
+
+    // ---------------------------------------------------------------
+    // Séparation des couloirs
+    // ---------------------------------------------------------------
+
+    /**
+     * S'assure qu'il y a au moins CORRIDOR_SPACING tile(s) de mur entre
+     * deux couloirs parallèles qui ne font pas partie de la même salle.
+     *
+     * Stratégie : on scanne chaque tile de sol. Si elle est adjacente à une
+     * tile de sol dans une direction ET que cette voisine n'est pas dans
+     * la même "bande" continue (i.e. il n'y a pas de connexion perpendiculaire),
+     * on ne touche pas à la salle — on laisse les salles intactes et on
+     * concentre l'effort sur les couloirs isolés.
+     *
+     * Implémentation simplifiée : on crée une copie de la grille et on
+     * repasse les couloirs creusés en forçant un mur entre deux bandes
+     * de sol séparées par moins de CORRIDOR_SPACING.
+     */
+    private void enforceCorridorSpacing() {
+        // Parcourt toutes les tiles. Si une tile de sol a une voisine de sol
+        // à exactement CORRIDOR_SPACING+1 de distance dans la même direction
+        // (sans connexion entre elles), on insère un mur entre les deux.
+        // On travaille sur une copie pour éviter les effets de bord.
+        int[][] copy = new int[rows][cols];
+        for (int r = 0; r < rows; r++)
+            copy[r] = grid[r].clone();
+
+        int gap = CORRIDOR_SPACING; // nombre de murs requis entre deux couloirs
+
+        // --- Vérification horizontale : deux bandes horizontales trop proches ---
+        for (int r = 1; r < rows - 1 - gap; r++) {
+            for (int c = 1; c < cols - 1; c++) {
+                if (grid[r][c] == DungeonMap.TILE_FLOOR) {
+                    // Regarde si dans gap+1 tiles vers le bas il y a du sol
+                    // ET que la colonne intermédiaire est aussi du sol (couloir adjacent)
+                    boolean allFloorBelow = true;
+                    for (int k = 1; k <= gap; k++) {
+                        if (grid[r + k][c] != DungeonMap.TILE_FLOOR) { allFloorBelow = false; break; }
+                    }
+                    // Si toutes les tiles intermédiaires sont déjà du sol, pas de problème
+                    // On cherche le cas où elles sont des murs (couloirs séparés par gap=0)
+                    if (!allFloorBelow && grid[r + gap + 1][c] == DungeonMap.TILE_FLOOR) {
+                        // Il y a un mur entre les deux — c'est OK, rien à faire
+                    }
+                    // Cas problématique : gap = 0, les deux couloirs se touchent directement
+                    if (gap == 0 && grid[r + 1][c] == DungeonMap.TILE_FLOOR) {
+                        // Vérifie que ce n'est pas une salle (connexion sur plusieurs colonnes)
+                        boolean isRoom = (c > 0 && grid[r][c-1] == DungeonMap.TILE_FLOOR
+                            && grid[r+1][c-1] == DungeonMap.TILE_FLOOR);
+                        if (!isRoom) copy[r + 1][c] = DungeonMap.TILE_WALL;
+                    }
+                }
+            }
+        }
+
+        // Recopie dans grid
+        for (int r = 0; r < rows; r++)
+            grid[r] = copy[r].clone();
     }
 
     // ---------------------------------------------------------------
@@ -208,11 +302,15 @@ public class DungeonGenerator {
         return (r != null) ? r : getAnyRoom(p.right);
     }
 
-    private Partition getFirstLeaf(Partition p) {
-        if (p == null) return null;
-        if (p.isLeaf()) return p;
-        Partition l = getFirstLeaf(p.left);
-        return (l != null) ? l : getFirstLeaf(p.right);
+    /** Collecte récursivement toutes les salles des feuilles dans la liste. */
+    private void collectRooms(Partition p, List<Room> out) {
+        if (p == null) return;
+        if (p.isLeaf()) {
+            if (p.room != null) out.add(p.room);
+            return;
+        }
+        collectRooms(p.left,  out);
+        collectRooms(p.right, out);
     }
 
     // ---------------------------------------------------------------
@@ -242,5 +340,6 @@ public class DungeonGenerator {
 
         int cx() { return x + w / 2; }
         int cy() { return y + h / 2; }
+        int area() { return w * h; }
     }
 }

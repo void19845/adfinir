@@ -10,9 +10,10 @@ import com.badlogic.gdx.math.Rectangle;
  */
 public class DungeonRenderer {
 
-    private static final Color COLOR_FLOOR = new Color(0.22f, 0.20f, 0.18f, 1f); // gris-brun foncé
-    private static final Color COLOR_WALL  = new Color(0.45f, 0.43f, 0.40f, 1f); // gris pierre
-    private static final Color COLOR_GRID  = new Color(0.12f, 0.11f, 0.10f, 1f); // séparateur subtle
+    private static final Color COLOR_FLOOR = new Color(0.22f, 0.20f, 0.18f, 1f);
+    private static final Color COLOR_WALL  = new Color(0.45f, 0.43f, 0.40f, 1f);
+    private static final Color COLOR_GRID  = new Color(0.12f, 0.11f, 0.10f, 1f);
+    private static final Color COLOR_EXIT  = new Color(0.10f, 0.80f, 0.30f, 1f); // vert vif
 
     private final DungeonMap map;
 
@@ -43,7 +44,6 @@ public class DungeonRenderer {
                     case DungeonMap.TILE_FLOOR:
                         sr.setColor(COLOR_FLOOR);
                         sr.rect(px, py, ts, ts);
-                        // Petit trait de grille
                         sr.setColor(COLOR_GRID);
                         sr.rect(px, py, ts, 1);
                         sr.rect(px, py, 1, ts);
@@ -52,8 +52,15 @@ public class DungeonRenderer {
                         sr.setColor(COLOR_WALL);
                         sr.rect(px, py, ts, ts);
                         break;
+                    case DungeonMap.TILE_EXIT:
+                        // Fond de sol + carré vert centré
+                        sr.setColor(COLOR_FLOOR);
+                        sr.rect(px, py, ts, ts);
+                        sr.setColor(COLOR_EXIT);
+                        float margin = ts * 0.2f;
+                        sr.rect(px + margin, py + margin, ts - margin * 2, ts - margin * 2);
+                        break;
                     default:
-                        // TILE_EMPTY : fond noir, rien à dessiner
                         break;
                 }
             }
