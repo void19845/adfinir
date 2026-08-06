@@ -120,6 +120,7 @@ public class GameScreen implements Screen {
         }
 
         engine.getSystem(StatsSystem.class).update(delta);
+        engine.getSystem(CombatSystem.class).update(delta);
         engine.getSystem(PlayerInputSystem.class).update(delta);
         engine.getSystem(MovementSystem.class).update(delta);
 

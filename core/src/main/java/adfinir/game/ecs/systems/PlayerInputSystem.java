@@ -39,8 +39,8 @@ public class PlayerInputSystem extends IteratingSystem {
         vel.vx = dx * input.speed;
         vel.vy = dy * input.speed;
 
-        // Attaque : Clic gauche ou Touche Espace
-        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+        // Attaque : Clic gauche (JustPressed) ou Touche Espace
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             CombatComponent combat = cm.get(entity);
             if (combat != null && combat.canAttack()) {
                 combat.triggerAttack();
