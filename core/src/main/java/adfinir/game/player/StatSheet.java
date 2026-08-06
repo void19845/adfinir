@@ -28,8 +28,8 @@ public class StatSheet {
         base.put(StatType.ATK,           10f);
         base.put(StatType.MAG,            5f);
         base.put(StatType.DEF,            5f);
-        base.put(StatType.SPD,           400f); // pixels/seconde
-        base.put(StatType.MAX_STAMINA,  100f);
+        base.put(StatType.SPD,           00f); // pixels/seconde
+        base.put(StatType.MAX_STAMINA,  200f);
         base.put(StatType.STAMINA_REGEN, 20f); // stamina/seconde
 
         // Initialise tous les bonus à 0
