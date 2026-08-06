@@ -72,13 +72,19 @@ public class StatsOverlay implements Disposable {
         float boxY  = screenH - MARGIN - boxH;
 
         // Fond semi-transparent
+        // Correction : On s'assure que le blending est activé pour la transparence
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         shapes.setColor(0f, 0f, 0f, 0.72f);
         shapes.rect(boxX, boxY, boxW, boxH);
         shapes.end();
-        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        // Le blending doit être désactivé si d'autres éléments du jeu ne l'utilisent pas,
+        // mais libGDX SpriteBatch l'active généralement.
+        // Pour éviter les bugs de rendu, on peut laisser activé ou gérer finement.
+        // Gdx.gl.glDisable(GL20.GL_BLEND);
 
         // Texte
         batch.begin();

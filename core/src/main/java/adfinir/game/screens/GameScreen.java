@@ -94,6 +94,7 @@ public class GameScreen implements Screen {
 
         PlayerStatsComponent playerStats = new PlayerStatsComponent();
         CombatComponent playerCombat = new CombatComponent();
+        playerCombat.weapon = Weapon.createSword(); // Equip une épée par défaut
 
         player.add(playerTransform);
         player.add(playerVel);
