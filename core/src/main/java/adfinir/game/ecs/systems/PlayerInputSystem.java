@@ -57,5 +57,22 @@ public class PlayerInputSystem extends IteratingSystem {
                 combat.triggerAttack(dirX, dirY);
             }
         }
+
+        // Switch arme : Touche X (pour test)
+        if (Gdx.input.isKeyJustPressed(Input.Keys.X)) {
+            CombatComponent combat = cm.get(entity);
+            if (combat != null) {
+                if (combat.weapon == null || combat.weapon.name.contains("Épée")) {
+                    combat.weapon = adfinir.game.player.Weapon.createAxe();
+                    Gdx.app.log("Input", "Weapon switched to: Axe");
+                } else if (combat.weapon.name.contains("Hache")) {
+                    combat.weapon = adfinir.game.player.Weapon.createLance();
+                    Gdx.app.log("Input", "Weapon switched to: Lance");
+                } else {
+                    combat.weapon = adfinir.game.player.Weapon.createSword();
+                    Gdx.app.log("Input", "Weapon switched to: Sword");
+                }
+            }
+        }
     }
 }
