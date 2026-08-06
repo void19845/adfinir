@@ -1,6 +1,7 @@
 package adfinir.game.ecs.components;
 
 import com.badlogic.ashley.core.Component;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Pool;
 
 /**
@@ -18,6 +19,8 @@ public class EnemyStatsComponent implements Component, Pool.Poolable {
 
     @Override
     public void reset() {
+        // Vie aléatoire entre 30 et 70 par défaut
+        maxHp = MathUtils.random(30f, 70f);
         currentHp = maxHp;
         isDead = false;
     }

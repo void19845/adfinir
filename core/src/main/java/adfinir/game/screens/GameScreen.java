@@ -13,6 +13,7 @@ import adfinir.game.ecs.components.RenderComponent;
 import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
 import adfinir.game.ecs.systems.CombatSystem;
+import adfinir.game.ecs.systems.DeathSystem;
 import adfinir.game.ecs.systems.EnemyMovementSystem;
 import adfinir.game.ecs.systems.MovementSystem;
 import adfinir.game.ecs.systems.PlayerInputSystem;
@@ -80,6 +81,7 @@ public class GameScreen implements Screen {
         dungeonRenderer = new DungeonRenderer(dungeonMap);
 
         engine = new Engine();
+        engine.addSystem(new DeathSystem());
         engine.addSystem(new StatsSystem());
         engine.addSystem(new EnemyMovementSystem());
         engine.addSystem(new CombatSystem());
@@ -131,19 +133,24 @@ public class GameScreen implements Screen {
         transform.x = x;
         transform.y = y;
 
+        VelocityComponent vel = new VelocityComponent();
+
         RenderComponent render = new RenderComponent();
         render.color = new Color(1.0f, 0.2f, 0.2f, 1f); // Rouge pour les ennemis
         render.width = 12f;
         render.height = 12f;
 
         EnemyStatsComponent stats = new EnemyStatsComponent();
+        EnemyAIComponent ai = new EnemyAIComponent();
 
         // Optionnel : combat component si l'ennemi peut attaquer plus tard
         CombatComponent combat = new CombatComponent();
 
         enemy.add(transform);
+        enemy.add(vel);
         enemy.add(render);
         enemy.add(stats);
+        enemy.add(ai);
         enemy.add(combat);
 
         engine.addEntity(enemy);

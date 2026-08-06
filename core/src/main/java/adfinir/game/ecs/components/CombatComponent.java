@@ -18,6 +18,7 @@ public class CombatComponent implements Component {
     // --- État actuel ---
     public float timer = 0f;            // Timer de cooldown
     public boolean isAttacking = false; // True si l'entité est en train de frapper
+    public boolean hasHit = false;      // True si l'attaque a déjà touché quelqu'un
 
     public boolean canAttack() {
         return timer <= 0f && weapon != null;
@@ -28,6 +29,7 @@ public class CombatComponent implements Component {
         this.attackDirX = dirX;
         this.attackDirY = dirY;
         isAttacking = true;
+        hasHit = false; // Reset hit for new attack
         timer = weapon.cooldown;
     }
 }

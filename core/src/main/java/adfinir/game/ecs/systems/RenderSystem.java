@@ -1,6 +1,7 @@
 package adfinir.game.ecs.systems;
 
 import adfinir.game.ecs.components.CombatComponent;
+import adfinir.game.ecs.components.EnemyStatsComponent;
 import adfinir.game.ecs.components.RenderComponent;
 import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.player.AttackShape;
@@ -21,6 +22,7 @@ public class RenderSystem extends IteratingSystem {
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
     private final ComponentMapper<RenderComponent>    rm = ComponentMapper.getFor(RenderComponent.class);
     private final ComponentMapper<CombatComponent>    cm = ComponentMapper.getFor(CombatComponent.class);
+    private final ComponentMapper<EnemyStatsComponent> esm = ComponentMapper.getFor(EnemyStatsComponent.class);
 
     private final ShapeRenderer shapeRenderer;
 
@@ -31,6 +33,9 @@ public class RenderSystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
+        EnemyStatsComponent enemyStats = esm.get(entity);
+        if (enemyStats != null && enemyStats.isDead) return;
+
         TransformComponent pos    = tm.get(entity);
         RenderComponent    render = rm.get(entity);
 
