@@ -34,7 +34,13 @@ public class PlayerInputSystem extends IteratingSystem {
 
         // Normaliser le vecteur diagonal pour éviter un mouvement plus rapide en diagonale
         float len = (float) Math.sqrt(dx * dx + dy * dy);
-        if (len > 0f) { dx /= len; dy /= len; }
+        if (len > 0f) {
+            dx /= len;
+            dy /= len;
+            // Mise à jour de l'orientation basée sur le mouvement actuel
+            input.lastDirX = dx;
+            input.lastDirY = dy;
+        }
 
         vel.vx = dx * input.speed;
         vel.vy = dy * input.speed;
@@ -43,16 +49,8 @@ public class PlayerInputSystem extends IteratingSystem {
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             CombatComponent combat = cm.get(entity);
             if (combat != null && combat.canAttack()) {
-                // Déterminer la direction de l'attaque basée sur la vélocité actuelle
-                float dirX = 1f;
-                float dirY = 0f;
-
-                float currentVelLen = (float) Math.sqrt(vel.vx * vel.vx + vel.vy * vel.vy);
-                if (currentVelLen > 0.1f) {
-                    dirX = vel.vx / currentVelLen;
-                    dirY = vel.vy / currentVelLen;
-                }
-                combat.triggerAttack(dirX, dirY);
+                // Utiliser la dernière direction enregistrée
+                combat.triggerAttack(input.lastDirX, input.lastDirY);
             }
         }
 

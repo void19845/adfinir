@@ -54,13 +54,12 @@ public class RenderSystem extends IteratingSystem {
 
             switch (weapon.shape) {
                 case CONE:
-                    // Épée : On utilise l'arc de ShapeRenderer pour créer un cône (wedge)
+                    // Épée : On utilise la fonction cone de ShapeRenderer
                     float angle = 60f; // Largeur du cône en degrés
-                    // Calcul de l'angle central en degrés
                     float centralAngle = (float) Math.toDegrees(Math.atan2(dy, dx));
                     float startAngle = centralAngle - angle / 2f;
 
-                    shapeRenderer.arc(
+                    shapeRenderer.cone(
                         pos.x, pos.y,
                         weapon.range / 2f,
                         startAngle,
@@ -72,7 +71,6 @@ public class RenderSystem extends IteratingSystem {
                     float halfW = weapon.width / 2f;
                     float length = weapon.range;
 
-                    // On place le rectangle devant le joueur
                     if (Math.abs(dx) > Math.abs(dy)) {
                         shapeRenderer.rect(
                             pos.x + (dx > 0 ? 0 : -length),
@@ -91,7 +89,6 @@ public class RenderSystem extends IteratingSystem {
                     break;
                 case ARC:
                     // Hache : On simule un arc par un rectangle large et court
-                    // décalé dans la direction de l'attaque.
                     float arcWidth = weapon.range * 1.5f;
                     float arcDepth = weapon.range;
 

@@ -9,8 +9,14 @@ import com.badlogic.gdx.utils.Pool;
 public class PlayerInputComponent implements Component, Pool.Poolable {
     public float speed = 80f; // pixels/seconde
 
+    // Direction du dernier mouvement non nul
+    public float lastDirX = 1f;
+    public float lastDirY = 0f;
+
     @Override
     public void reset() {
         speed = 80f;
+        lastDirX = 1f;
+        lastDirY = 0f;
     }
 }
