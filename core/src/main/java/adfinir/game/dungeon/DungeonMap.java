@@ -1,5 +1,11 @@
 package adfinir.game.dungeon;
 
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Représente la carte du donjon sous forme de grille d'entiers.
  *
@@ -71,6 +77,24 @@ public class DungeonMap {
 
     /** Retourne la hauteur totale de la carte en pixels. */
     public float getPixelHeight() { return rows * TILE_SIZE; }
+
+    /** Retourne une position pixel aléatoire sur une tile de sol. */
+    public Vector2 getRandomFloorPosition() {
+        List<int[]> floors = new ArrayList<>();
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (getTile(c, r) == TILE_FLOOR) {
+                    floors.add(new int[]{c, r});
+                }
+            }
+        }
+        if (floors.isEmpty()) return new Vector2(getSpawnPixelX(), getSpawnPixelY());
+
+        int[] picked = floors.get(MathUtils.random(floors.size()));
+        float px = picked[0] * TILE_SIZE + TILE_SIZE / 2f;
+        float py = picked[1] * TILE_SIZE + TILE_SIZE / 2f;
+        return new Vector2(px, py);
+    }
 
     /**
      * Crée une carte de test statique (20×15 tiles).

@@ -1,0 +1,32 @@
+package adfinir.game.ecs.components;
+
+import com.badlogic.ashley.core.Component;
+import com.badlogic.gdx.utils.Pool;
+
+/**
+ * Composant gérant les statistiques d'un ennemi.
+ */
+public class EnemyStatsComponent implements Component, Pool.Poolable {
+    public float currentHp;
+    public float maxHp = 50f;
+    public float def = 2f;
+    public boolean isDead = false;
+
+    public EnemyStatsComponent() {
+        reset();
+    }
+
+    @Override
+    public void reset() {
+        currentHp = maxHp;
+        isDead = false;
+    }
+
+    /** Inflige des dégâts en tenant compte de la DEF. Retourne les dégâts réels subis. */
+    public float takeDamage(float rawDamage) {
+        float dmg = Math.max(1f, rawDamage - def);
+        currentHp = Math.max(0f, currentHp - dmg);
+        if (currentHp <= 0f) isDead = true;
+        return dmg;
+    }
+}

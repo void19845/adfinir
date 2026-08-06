@@ -5,17 +5,21 @@ import adfinir.game.dungeon.DungeonGenerator;
 import adfinir.game.dungeon.DungeonMap;
 import adfinir.game.dungeon.DungeonRenderer;
 import adfinir.game.ecs.components.CombatComponent;
+import adfinir.game.ecs.components.EnemyAIComponent;
+import adfinir.game.ecs.components.EnemyStatsComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
 import adfinir.game.ecs.components.RenderComponent;
 import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
 import adfinir.game.ecs.systems.CombatSystem;
+import adfinir.game.ecs.systems.EnemyMovementSystem;
 import adfinir.game.ecs.systems.MovementSystem;
 import adfinir.game.ecs.systems.PlayerInputSystem;
 import adfinir.game.ecs.systems.RenderSystem;
 import adfinir.game.ecs.systems.StatsSystem;
 import adfinir.game.player.Weapon;
+import adfinir.game.ui.MiniMap;
 import adfinir.game.ui.StatsOverlay;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
@@ -52,6 +56,9 @@ public class GameScreen implements Screen {
     private PlayerStatsComponent playerStats;
 
     private StatsOverlay statsOverlay;
+    private MiniMap      miniMap;
+    private OrthographicCamera uiCamera;
+    private int screenW, screenH;
     private int currentLevel = 1;
 
     public GameScreen(Main game) {
@@ -74,6 +81,7 @@ public class GameScreen implements Screen {
 
         engine = new Engine();
         engine.addSystem(new StatsSystem());
+        engine.addSystem(new EnemyMovementSystem());
         engine.addSystem(new CombatSystem());
         engine.addSystem(new PlayerInputSystem());
         engine.addSystem(new MovementSystem(dungeonMap));
@@ -105,7 +113,40 @@ public class GameScreen implements Screen {
         player.add(playerCombat);
         engine.addEntity(player);
 
+        // Ajout de quelques ennemis fixes dans des zones accessibles
+        for (int i = 0; i < 5; i++) {
+            com.badlogic.gdx.math.Vector2 pos = dungeonMap.getRandomFloorPosition();
+            spawnEnemy(pos.x, pos.y);
+        }
+
         statsOverlay = new StatsOverlay();
+        miniMap      = new MiniMap();
+        uiCamera     = new OrthographicCamera();
+    }
+
+    private void spawnEnemy(float x, float y) {
+        Entity enemy = new Entity();
+
+        TransformComponent transform = new TransformComponent();
+        transform.x = x;
+        transform.y = y;
+
+        RenderComponent render = new RenderComponent();
+        render.color = new Color(1.0f, 0.2f, 0.2f, 1f); // Rouge pour les ennemis
+        render.width = 12f;
+        render.height = 12f;
+
+        EnemyStatsComponent stats = new EnemyStatsComponent();
+
+        // Optionnel : combat component si l'ennemi peut attaquer plus tard
+        CombatComponent combat = new CombatComponent();
+
+        enemy.add(transform);
+        enemy.add(render);
+        enemy.add(stats);
+        enemy.add(combat);
+
+        engine.addEntity(enemy);
     }
 
     @Override
@@ -155,14 +196,23 @@ public class GameScreen implements Screen {
 
         shapeRenderer.end();
 
+        shapeRenderer.setProjectionMatrix(uiCamera.combined);
+        miniMap.draw(shapeRenderer, dungeonMap, playerTransform, screenW, screenH);
+
         statsOverlay.update(playerStats, delta);
         statsOverlay.draw();
     }
 
     @Override
     public void resize(int w, int h) {
+        screenW = w;
+        screenH = h;
         viewport.update(w, h, true);
         statsOverlay.resize(w, h);
+        uiCamera.viewportWidth = w;
+        uiCamera.viewportHeight = h;
+        uiCamera.position.set(w / 2f, h / 2f, 0);
+        uiCamera.update();
     }
 
     @Override public void pause()  {}
