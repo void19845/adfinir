@@ -46,7 +46,6 @@ Trois modes d'attaque disponibles simultanément :
 | Distance | Projectile lancé dans la direction visée | Arc, baguette |
 | Compétence spéciale | Cooldown, effet puissant (zone, dash, invoc.) | Boule de feu, téléportation |
 
-**Attributs de combat :**
 - PV (points de vie)
 - ATK (attaque physique)
 - MAG (puissance magique)
@@ -234,20 +233,20 @@ core/src/main/java/adfinir/game/
 ## 8. Roadmap de développement
 
 ### Phase 1 — Fondations
-- [ ] Mise en place des Screens (Menu, Game, GameOver)
-- [ ] Rendu d'une grille de tiles statique
-- [ ] Joueur avec mouvement fluide (Ashley + Box2D)
+- [x] Mise en place des Screens (Menu, Game, GameOver)
+- [x] Rendu d'une grille de tiles statique
+- [x] Joueur avec mouvement fluide (Ashley)
 
 ### Phase 2 — Donjon
-- [ ] Algorithme de génération procédurale (salles + couloirs)
-- [ ] Collisions murs/joueur via Box2D
-- [ ] Caméra qui suit le joueur
+- [x] Algorithme de génération procédurale (salles + couloirs)
+- [ ] Collisions murs/joueur via Box2D (Actuellement implémenté via `map.isSolid()`)
+- [x] Caméra qui suit le joueur
 
 ### Phase 3 — Combat
 - [ ] Attaque mêlée (hitbox temporaire)
 - [ ] Projectiles (arc / magie)
 - [ ] Ennemis basiques avec IA simple (chase + attack)
-- [ ] Système de PV + mort
+- [ ] Système de PV + mort (Logique de base présente dans `PlayerStatsComponent`)
 
 ### Phase 4 — Contenu
 - [ ] Inventaire & équipement

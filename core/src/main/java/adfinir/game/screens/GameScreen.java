@@ -4,11 +4,13 @@ import adfinir.game.Main;
 import adfinir.game.dungeon.DungeonGenerator;
 import adfinir.game.dungeon.DungeonMap;
 import adfinir.game.dungeon.DungeonRenderer;
+import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
 import adfinir.game.ecs.components.RenderComponent;
 import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
+import adfinir.game.ecs.systems.CombatSystem;
 import adfinir.game.ecs.systems.MovementSystem;
 import adfinir.game.ecs.systems.PlayerInputSystem;
 import adfinir.game.ecs.systems.RenderSystem;
@@ -71,6 +73,7 @@ public class GameScreen implements Screen {
 
         engine = new Engine();
         engine.addSystem(new StatsSystem());
+        engine.addSystem(new CombatSystem());
         engine.addSystem(new PlayerInputSystem());
         engine.addSystem(new MovementSystem(dungeonMap));
         engine.addSystem(new RenderSystem(shapeRenderer));
@@ -89,13 +92,15 @@ public class GameScreen implements Screen {
         PlayerInputComponent playerInput = new PlayerInputComponent();
         playerInput.speed = 80f;
 
-        playerStats = new PlayerStatsComponent();
+        PlayerStatsComponent playerStats = new PlayerStatsComponent();
+        CombatComponent playerCombat = new CombatComponent();
 
         player.add(playerTransform);
         player.add(playerVel);
         player.add(playerRender);
         player.add(playerInput);
         player.add(playerStats);
+        player.add(playerCombat);
         engine.addEntity(player);
 
         statsOverlay = new StatsOverlay();

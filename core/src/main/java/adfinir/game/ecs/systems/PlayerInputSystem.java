@@ -1,5 +1,6 @@
 package adfinir.game.ecs.systems;
 
+import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.VelocityComponent;
 import com.badlogic.ashley.core.ComponentMapper;
@@ -13,6 +14,7 @@ public class PlayerInputSystem extends IteratingSystem {
 
     private final ComponentMapper<VelocityComponent>    vm = ComponentMapper.getFor(VelocityComponent.class);
     private final ComponentMapper<PlayerInputComponent> pm = ComponentMapper.getFor(PlayerInputComponent.class);
+    private final ComponentMapper<CombatComponent>      cm = ComponentMapper.getFor(CombatComponent.class);
 
     public PlayerInputSystem() {
         super(Family.all(PlayerInputComponent.class, VelocityComponent.class).get(), 1);
@@ -36,5 +38,13 @@ public class PlayerInputSystem extends IteratingSystem {
 
         vel.vx = dx * input.speed;
         vel.vy = dy * input.speed;
+
+        // Attaque : Clic gauche ou Touche Espace
+        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+            CombatComponent combat = cm.get(entity);
+            if (combat != null && combat.canAttack()) {
+                combat.triggerAttack();
+            }
+        }
     }
 }
