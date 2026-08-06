@@ -23,7 +23,7 @@ public class Weapon {
     }
 
     public static Weapon createSword() {
-        return new Weapon("Épée courte", 15f, AttackShape.SQUARE, 30f, 30f, 0.4f, 0.15f);
+        return new Weapon("Épée courte", 15f, AttackShape.CONE, 30f, 30f, 0.4f, 0.15f);
     }
 
     public static Weapon createAxe() {
