@@ -239,7 +239,7 @@ core/src/main/java/adfinir/game/
 
 ### Phase 2 — Donjon
 - [x] Algorithme de génération procédurale (salles + couloirs)
-- [ ] Collisions murs/joueur via Box2D (Actuellement implémenté via `map.isSolid()`)
+- [x] Collisions murs/joueur via Box2D (Actuellement implémenté via `map.isSolid()`)
 - [x] Caméra qui suit le joueur
 
 ### Phase 3 — Combat

@@ -83,7 +83,6 @@ public class GameScreen implements Screen {
         engine = new Engine();
         engine.addSystem(new DeathSystem());
         engine.addSystem(new StatsSystem());
-        engine.addSystem(new EnemyMovementSystem());
         engine.addSystem(new CombatSystem());
         engine.addSystem(new PlayerInputSystem());
         engine.addSystem(new MovementSystem(dungeonMap));
@@ -115,6 +114,9 @@ public class GameScreen implements Screen {
         player.add(playerCombat);
         engine.addEntity(player);
 
+        // MAINTENANT on ajoute le système de mouvement ennemi avec le joueur initialisé
+        engine.addSystem(new EnemyMovementSystem(dungeonMap, player));
+
         // Ajout de quelques ennemis fixes dans des zones accessibles
         for (int i = 0; i < 5; i++) {
             com.badlogic.gdx.math.Vector2 pos = dungeonMap.getRandomFloorPosition();
@@ -143,7 +145,11 @@ public class GameScreen implements Screen {
         EnemyStatsComponent stats = new EnemyStatsComponent();
         EnemyAIComponent ai = new EnemyAIComponent();
 
-        // Optionnel : combat component si l'ennemi peut attaquer plus tard
+        // Vitesse random mais pas excessive (max 60f, le joueur est à 80f)
+        ai.speed = com.badlogic.gdx.math.MathUtils.random(20f, 50f);
+        ai.pursuitSpeed = ai.speed * 1.2f; // Un peu plus rapide en poursuite, mais reste < 80
+        ai.detectionRange = com.badlogic.gdx.math.MathUtils.random(80f, 150f);
+
         CombatComponent combat = new CombatComponent();
 
         enemy.add(transform);
