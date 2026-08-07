@@ -1,5 +1,6 @@
 package adfinir.game.ecs.components;
 
+import adfinir.game.inventory.Item;
 import com.badlogic.ashley.core.Component;
 
 /**
@@ -13,4 +14,11 @@ public class LootComponent implements Component {
 
     public LootType type;
     public float threatFactor = 1f;
+
+    /**
+     * Si non-null : item déjà généré à utiliser tel quel au ramassage, au lieu
+     * d'en tirer un nouveau via ItemGenerator. Utilisé quand un item de la barre
+     * est reposé au sol (échange [F] avec un item ramassable, barre pleine).
+     */
+    public Item concreteItem;
 }

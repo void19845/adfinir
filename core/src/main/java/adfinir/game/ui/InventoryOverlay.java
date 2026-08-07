@@ -12,12 +12,19 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Disposable;
 
+import java.util.List;
+
 /**
  * Overlay plein écran affichant l'inventaire et l'équipement du joueur.
  *
  * Layout entièrement dérivé de constantes (BOX_W / BOX_H calculés à partir
  * du header, des 4 slots et du footer) pour éviter tout chevauchement,
  * quelle que soit la taille de police ou d'icône utilisée.
+ *
+ * Un panneau de détails est affiché à droite de chaque slot :
+ *  - Armure / Artéfact  : bonus de stats (+X PV Max, +X DEF, ...)
+ *  - Arme               : liste des combos (dégâts, cooldown)
+ *  - Capacité           : effet principal + modificateurs
  */
 public class InventoryOverlay implements Disposable {
 
@@ -39,7 +46,14 @@ public class InventoryOverlay implements Disposable {
     private static final float SPRITE_MAX = 34f;  // taille max de l'icône dans un slot
     private static final int   SLOT_COUNT = 4;
 
-    private static final float BOX_W = SLOT_W + 2 * PADDING;
+    private static final float DETAIL_W        = 280f; // largeur du panneau de détails
+    private static final float DETAIL_LINE_H   = 13f;
+    private static final float DETAIL_SCALE    = 0.8f;
+    private static final int   DETAIL_MAX_LINES = 5;   // sécurité anti-débordement du slot
+
+    private static final float BOX_W =
+        PADDING + SLOT_W + PADDING + DETAIL_W + PADDING;
+
     private static final float BOX_H =
         PADDING                                   // bord haut
             + HEADER_H
@@ -74,6 +88,7 @@ public class InventoryOverlay implements Disposable {
         float boxX = MARGIN;
         float boxY = (screenH - BOX_H) / 2f;
         float slotX = boxX + PADDING;
+        float detailX = slotX + SLOT_W + PADDING;
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -93,6 +108,7 @@ public class InventoryOverlay implements Disposable {
         for (int i = 0; i < SLOT_COUNT; i++) {
             float slotY = firstSlotTop - i * (SLOT_H + SLOT_GAP) - SLOT_H;
             shapes.rect(slotX, slotY, SLOT_W, SLOT_H);
+            shapes.rect(detailX, slotY, DETAIL_W, SLOT_H);
         }
         shapes.end();
 
@@ -113,6 +129,7 @@ public class InventoryOverlay implements Disposable {
         for (int i = 0; i < SLOT_COUNT; i++) {
             float slotY = firstSlotTop - i * (SLOT_H + SLOT_GAP) - SLOT_H;
             drawSlotContent(batch, slotX, slotY, labels[i], items[i]);
+            drawDetailPanel(batch, detailX, slotY, items[i]);
         }
 
         // Pied de page
@@ -144,7 +161,7 @@ public class InventoryOverlay implements Disposable {
             }
 
             // Nom + couleur de rareté, contraint et tronqué dans la zone de texte
-            font.setColor(getRarityColor(item.rarity));
+            font.setColor(ItemDetails.rarityColor(item.rarity));
             font.draw(batch, item.name, x + 6, y + SLOT_H - 22, textZoneW, Align.left, true);
 
             // Description courte, une seule ligne
@@ -159,14 +176,29 @@ public class InventoryOverlay implements Disposable {
         }
     }
 
-    private Color getRarityColor(Rarity rarity) {
-        switch (rarity) {
-            case LEGENDARY: return Color.ORANGE;
-            case EPIC:      return Color.PURPLE;
-            case RARE:      return Color.CYAN;
-            case COMMON:    return Color.WHITE;
-            default:        return Color.WHITE;
+    /**
+     * Panneau de détails à droite du slot : stats (Armure/Artéfact),
+     * combos (Arme) ou effet + modificateurs (Capacité).
+     */
+    private void drawDetailPanel(SpriteBatch batch, float x, float slotY, Item item) {
+        if (item == null) return;
+
+        List<String> lines = ItemDetails.buildDetailLines(item);
+        if (lines.isEmpty()) return;
+
+        font.getData().setScale(DETAIL_SCALE);
+        font.setColor(Color.LIGHT_GRAY);
+
+        float textX = x + 6;
+        float textW = DETAIL_W - 12;
+        float y = slotY + SLOT_H - 6;
+
+        int shown = Math.min(lines.size(), DETAIL_MAX_LINES);
+        for (int i = 0; i < shown; i++) {
+            font.draw(batch, lines.get(i), textX, y - i * DETAIL_LINE_H, textW, Align.left, true);
         }
+
+        font.getData().setScale(1f);
     }
 
     public void resize(int w, int h) {

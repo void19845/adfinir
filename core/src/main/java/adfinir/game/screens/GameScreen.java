@@ -7,6 +7,7 @@ import adfinir.game.dungeon.DungeonRenderer;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.EnemyAIComponent;
 import adfinir.game.ecs.components.EnemyStatsComponent;
+import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.LootComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
@@ -30,6 +31,7 @@ import adfinir.game.save.SaveData;
 import adfinir.game.save.SaveManager;
 import adfinir.game.ui.MiniMap;
 import adfinir.game.ui.InventoryOverlay;
+import adfinir.game.ui.LootBarOverlay;
 import adfinir.game.ui.StatsOverlay;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
@@ -73,6 +75,7 @@ public class GameScreen implements Screen {
 
     private StatsOverlay statsOverlay;
     private InventoryOverlay inventoryOverlay;
+    private LootBarOverlay lootBarOverlay;
     private MiniMap      miniMap;
     private OrthographicCamera uiCamera;
     private int screenW, screenH;
@@ -199,6 +202,8 @@ public class GameScreen implements Screen {
 
             playerCombat.weapon = inventory.weapon;
 
+            LootBarComponent lootBar = new LootBarComponent();
+
             player.add(playerTransform);
             player.add(playerVel);
             player.add(playerRender);
@@ -206,10 +211,12 @@ public class GameScreen implements Screen {
             player.add(playerStats);
             player.add(playerCombat);
             player.add(inventory);
+            player.add(lootBar);
             engine.addEntity(player);
 
             statsOverlay = new StatsOverlay();
             inventoryOverlay = new InventoryOverlay();
+            lootBarOverlay = new LootBarOverlay();
             miniMap      = new MiniMap();
             uiCamera     = new OrthographicCamera();
         } else {
@@ -226,7 +233,7 @@ public class GameScreen implements Screen {
         replaceSystem(EnemyMovementSystem.class, new EnemyMovementSystem(dungeonMap, player));
         replaceSystem(EnemyAttackSystem.class, new EnemyAttackSystem(player));
         replaceSystem(LootPickupSystem.class,
-            new LootPickupSystem(player, player.getComponent(InventoryComponent.class), playerStats));
+            new LootPickupSystem(player, player.getComponent(LootBarComponent.class)));
 
         spawnEnemiesForFloor(threatFactor);
         spawnLootForFloor(threatFactor);
@@ -371,15 +378,20 @@ public class GameScreen implements Screen {
             ? 0.12f + 0.13f * (MathUtils.sin(totalTime * 6f) + 1f) / 2f
             : 0f;
 
-        if (!inventoryOverlay.isVisible()) {
-            engine.getSystem(StatsSystem.class).update(delta);
-            engine.getSystem(CombatSystem.class).update(delta);
-            engine.getSystem(PlayerInputSystem.class).update(delta);
-            engine.getSystem(EnemyMovementSystem.class).update(delta);
-            engine.getSystem(EnemyAttackSystem.class).update(delta);
-            engine.getSystem(MovementSystem.class).update(delta);
-            engine.getSystem(LootPickupSystem.class).update(delta);
-            engine.getSystem(DeathSystem.class).update(delta);
+        lootBarOverlay.update(player.getComponent(LootBarComponent.class),
+            player.getComponent(InventoryComponent.class),
+            player.getComponent(CombatComponent.class),
+            playerStats);
+        lootBarOverlay.handleInput();
+
+        engine.getSystem(StatsSystem.class).update(delta);
+        engine.getSystem(CombatSystem.class).update(delta);
+        engine.getSystem(PlayerInputSystem.class).update(delta);
+        engine.getSystem(EnemyMovementSystem.class).update(delta);
+        engine.getSystem(EnemyAttackSystem.class).update(delta);
+        engine.getSystem(MovementSystem.class).update(delta);
+        engine.getSystem(LootPickupSystem.class).update(delta);
+        engine.getSystem(DeathSystem.class).update(delta);
 
             // Détecte une perte de PV pour déclencher un flash d'impact à l'écran
             if (previousHp < 0f) {
@@ -389,20 +401,19 @@ public class GameScreen implements Screen {
             }
             previousHp = playerStats.currentHp;
 
-            // Mort du joueur → écran de game over (permadeath : la sauvegarde est effacée)
-            if (playerStats.isDead) {
-                SaveManager.deleteSave();
-                game.setScreen(new GameOverScreen(game, currentLevel));
-                dispose();
-                return;
-            }
+        // Mort du joueur → écran de game over (permadeath : la sauvegarde est effacée)
+        if (playerStats.isDead) {
+            SaveManager.deleteSave();
+            game.setScreen(new GameOverScreen(game, currentLevel));
+            dispose();
+            return;
+        }
 
-            // Détecte l'arrivée sur la case de sortie (verte) → étage suivant
-            int playerCol = (int) (playerTransform.x / DungeonMap.TILE_SIZE);
-            int playerRow = (int) (playerTransform.y / DungeonMap.TILE_SIZE);
-            if (dungeonMap.getTile(playerCol, playerRow) == DungeonMap.TILE_EXIT) {
-                goToNextFloor();
-            }
+        // Détecte l'arrivée sur la case de sortie (verte) → étage suivant
+        int playerCol = (int) (playerTransform.x / DungeonMap.TILE_SIZE);
+        int playerRow = (int) (playerTransform.y / DungeonMap.TILE_SIZE);
+        if (dungeonMap.getTile(playerCol, playerRow) == DungeonMap.TILE_EXIT) {
+            goToNextFloor();
         }
 
         // Clamp caméra en tenant compte de la vue étendue
@@ -438,6 +449,8 @@ public class GameScreen implements Screen {
 
         inventoryOverlay.update(player.getComponent(InventoryComponent.class));
         inventoryOverlay.draw();
+
+        lootBarOverlay.draw();
 
         shapeRenderer.setProjectionMatrix(uiCamera.combined);
         miniMap.draw(shapeRenderer, dungeonMap, playerTransform, screenW, screenH);
@@ -480,6 +493,7 @@ public class GameScreen implements Screen {
         viewport.update(w, h, true);
         statsOverlay.resize(w, h);
         inventoryOverlay.resize(w, h);
+        lootBarOverlay.resize(w, h);
         uiCamera.viewportWidth = w;
         uiCamera.viewportHeight = h;
         uiCamera.position.set(w / 2f, h / 2f, 0);
@@ -495,5 +509,6 @@ public class GameScreen implements Screen {
         shapeRenderer.dispose();
         statsOverlay.dispose();
         inventoryOverlay.dispose();
+        lootBarOverlay.dispose();
     }
 }
