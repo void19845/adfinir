@@ -77,6 +77,16 @@ public class GameScreen implements Screen {
     private OrthographicCamera uiCamera;
     private int screenW, screenH;
 
+    // --- Habillage visuel (n'affecte aucune logique de jeu) ---
+    /** 1 = écran couvert de noir (fondu d'entrée / changement d'étage), 0 = normal. */
+    private float transitionAlpha = 1f;
+    /** Flash rouge bref à la réception de dégâts. */
+    private float damageFlashAlpha = 0f;
+    /** Pulsation rouge continue quand les PV sont bas. */
+    private float lowHpPulse = 0f;
+    private float previousHp = -1f;
+    private float totalTime = 0f;
+
     /** Étage courant (1 = premier étage). Détermine le threatFactor. */
     private int currentLevel = 1;
 
@@ -324,6 +334,7 @@ public class GameScreen implements Screen {
 
     /** Appelé quand le joueur atteint la tile de sortie (case verte). */
     private void goToNextFloor() {
+        transitionAlpha = 1f; // fondu au noir le temps de générer le nouvel étage
         currentLevel++;
         generateFloor(false);
         // Recentre immédiatement la caméra pour éviter un panoramique à travers l'ancien étage
@@ -350,6 +361,16 @@ public class GameScreen implements Screen {
             inventoryOverlay.toggle();
         }
 
+        totalTime += delta;
+        transitionAlpha = Math.max(0f, transitionAlpha - delta / 0.6f);
+        damageFlashAlpha = Math.max(0f, damageFlashAlpha - delta * 1.8f);
+
+        float hpRatio = playerStats.stats.maxHp() > 0
+            ? playerStats.currentHp / (float) playerStats.stats.maxHp() : 1f;
+        lowHpPulse = hpRatio < 0.25f
+            ? 0.12f + 0.13f * (MathUtils.sin(totalTime * 6f) + 1f) / 2f
+            : 0f;
+
         if (!inventoryOverlay.isVisible()) {
             engine.getSystem(StatsSystem.class).update(delta);
             engine.getSystem(CombatSystem.class).update(delta);
@@ -359,6 +380,14 @@ public class GameScreen implements Screen {
             engine.getSystem(MovementSystem.class).update(delta);
             engine.getSystem(LootPickupSystem.class).update(delta);
             engine.getSystem(DeathSystem.class).update(delta);
+
+            // Détecte une perte de PV pour déclencher un flash d'impact à l'écran
+            if (previousHp < 0f) {
+                previousHp = playerStats.currentHp;
+            } else if (playerStats.currentHp < previousHp - 0.01f) {
+                damageFlashAlpha = 0.5f;
+            }
+            previousHp = playerStats.currentHp;
 
             // Mort du joueur → écran de game over (permadeath : la sauvegarde est effacée)
             if (playerStats.isDead) {
@@ -388,7 +417,9 @@ public class GameScreen implements Screen {
         camera.position.y += (camTargetY - camera.position.y) * 6f * delta;
         camera.update();
 
-        Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
+        // Teinte de fond légèrement plus rouge à mesure que le danger augmente avec l'étage
+        float danger = MathUtils.clamp((currentLevel - 1) * 0.03f, 0f, 0.16f);
+        Gdx.gl.glClearColor(danger, 0f, 0.01f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         viewport.apply();
@@ -413,6 +444,33 @@ public class GameScreen implements Screen {
 
         statsOverlay.update(playerStats, delta);
         statsOverlay.draw();
+
+        drawScreenOverlays();
+    }
+
+    /** Fondu de transition, flash de dégâts et pulsation "PV bas" — habillage écran-entier, sans logique de jeu. */
+    private void drawScreenOverlays() {
+        if (transitionAlpha <= 0.001f && damageFlashAlpha <= 0.001f && lowHpPulse <= 0.001f) {
+            return;
+        }
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        shapeRenderer.setProjectionMatrix(uiCamera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+
+        if (transitionAlpha > 0.001f) {
+            shapeRenderer.setColor(0f, 0f, 0f, transitionAlpha);
+            shapeRenderer.rect(0, 0, screenW, screenH);
+        }
+        if (lowHpPulse > 0.001f) {
+            shapeRenderer.setColor(0.6f, 0f, 0f, lowHpPulse);
+            shapeRenderer.rect(0, 0, screenW, screenH);
+        }
+        if (damageFlashAlpha > 0.001f) {
+            shapeRenderer.setColor(0.85f, 0.05f, 0.05f, damageFlashAlpha);
+            shapeRenderer.rect(0, 0, screenW, screenH);
+        }
+
+        shapeRenderer.end();
     }
 
     @Override
