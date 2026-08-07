@@ -7,6 +7,7 @@ import adfinir.game.dungeon.DungeonRenderer;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.EnemyAIComponent;
 import adfinir.game.ecs.components.EnemyStatsComponent;
+import adfinir.game.ecs.components.LootComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
 import adfinir.game.ecs.components.RenderComponent;
@@ -14,7 +15,9 @@ import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
 import adfinir.game.ecs.systems.CombatSystem;
 import adfinir.game.ecs.systems.DeathSystem;
+import adfinir.game.ecs.systems.EnemyAttackSystem;
 import adfinir.game.ecs.systems.EnemyMovementSystem;
+import adfinir.game.ecs.systems.LootPickupSystem;
 import adfinir.game.ecs.systems.MovementSystem;
 import adfinir.game.ecs.systems.PlayerInputSystem;
 import adfinir.game.ecs.systems.RenderSystem;
@@ -23,11 +26,15 @@ import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.ecs.components.InventoryComponent;
 import adfinir.game.inventory.Weapon;
 
+import adfinir.game.save.SaveData;
+import adfinir.game.save.SaveManager;
 import adfinir.game.ui.MiniMap;
 import adfinir.game.ui.InventoryOverlay;
 import adfinir.game.ui.StatsOverlay;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.EntitySystem;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
@@ -37,6 +44,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 
 public class GameScreen implements Screen {
@@ -45,6 +53,9 @@ public class GameScreen implements Screen {
     // pour remplir l'écran sans étirement ni bandes noires
     private static final int VIEW_W = 320;
     private static final int VIEW_H = 240;
+
+    /** Augmentation du threatFactor par étage descendu (+20% par étage). */
+    private static final float THREAT_STEP = 0.2f;
 
     private final Main game;
 
@@ -65,10 +76,22 @@ public class GameScreen implements Screen {
     private MiniMap      miniMap;
     private OrthographicCamera uiCamera;
     private int screenW, screenH;
+
+    /** Étage courant (1 = premier étage). Détermine le threatFactor. */
     private int currentLevel = 1;
 
+    /** Sauvegarde à restaurer au premier show(), ou null pour une nouvelle partie. */
+    private SaveData pendingLoad;
+
+    /** Nouvelle partie. */
     public GameScreen(Main game) {
+        this(game, null);
+    }
+
+    /** Reprend une partie sauvegardée si saveToLoad != null, sinon nouvelle partie. */
+    public GameScreen(Main game, SaveData saveToLoad) {
         this.game = game;
+        this.pendingLoad = saveToLoad;
     }
 
     @Override
@@ -81,71 +104,153 @@ public class GameScreen implements Screen {
         shapeRenderer = new ShapeRenderer();
         shapeRenderer.setAutoShapeType(true);
 
-        DungeonGenerator generator = new DungeonGenerator(50, 40);
-        dungeonMap      = generator.generate();
-        dungeonRenderer = new DungeonRenderer(dungeonMap);
-
-        engine = new Engine();
-        engine.addSystem(new DeathSystem());
-        engine.addSystem(new StatsSystem());
-        engine.addSystem(new CombatSystem());
-        engine.addSystem(new PlayerInputSystem());
-        engine.addSystem(new MovementSystem(dungeonMap));
-        engine.addSystem(new RenderSystem(shapeRenderer));
-
-        player          = new Entity();
-        playerTransform = new TransformComponent();
-        playerTransform.x = dungeonMap.getSpawnPixelX();
-        playerTransform.y = dungeonMap.getSpawnPixelY();
-
-        VelocityComponent    playerVel   = new VelocityComponent();
-        RenderComponent      playerRender = new RenderComponent();
-        playerRender.color  = new Color(0.2f, 0.7f, 1.0f, 1f);
-        playerRender.width  = 12f;
-        playerRender.height = 12f;
-
-        PlayerInputComponent playerInput = new PlayerInputComponent();
-        playerInput.speed = 80f;
-
-        playerStats = new PlayerStatsComponent();
-        CombatComponent playerCombat = new CombatComponent();
-
-        InventoryComponent inventory = new InventoryComponent();
-        inventory.equipWeapon(ItemGenerator.generateWeapon());
-        inventory.equipArmor(ItemGenerator.generateArmor());
-        inventory.equipCapacity(ItemGenerator.generateCapacity());
-        inventory.equipArtifact(ItemGenerator.generateArtifact());
-
-        // Synchronise les stats de départ avec l'équipement généré
-        inventory.updateStats(playerStats.stats);
-
-        playerCombat.weapon = inventory.weapon;
-
-        player.add(playerTransform);
-        player.add(playerVel);
-        player.add(playerRender);
-        player.add(playerInput);
-        player.add(playerStats);
-        player.add(playerCombat);
-        player.add(inventory);
-        engine.addEntity(player);
-
-        // MAINTENANT on ajoute le système de mouvement ennemi avec le joueur initialisé
-        engine.addSystem(new EnemyMovementSystem(dungeonMap, player));
-
-        // Ajout de quelques ennemis fixes dans des zones accessibles
-        for (int i = 0; i < 5; i++) {
-            com.badlogic.gdx.math.Vector2 pos = dungeonMap.getRandomFloorPosition();
-            spawnEnemy(pos.x, pos.y);
-        }
-
-        statsOverlay = new StatsOverlay();
-        inventoryOverlay = new InventoryOverlay();
-        miniMap      = new MiniMap();
-        uiCamera     = new OrthographicCamera();
+        generateFloor(true);
     }
 
-    private void spawnEnemy(float x, float y) {
+    /** Multiplicateur appliqué aux stats/dégâts/vitesse des ennemis et à la qualité du loot. */
+    private float getThreatFactor() {
+        return 1f + (currentLevel - 1) * THREAT_STEP;
+    }
+
+    /**
+     * Génère (ou régénère) l'étage courant.
+     *
+     * firstFloor = true  : construit l'Engine et le joueur (appel initial depuis show()).
+     * firstFloor = false : conserve le joueur, ses stats et son équipement (sauvegarde
+     *                      de la progression), nettoie les ennemis/loot de l'étage
+     *                      précédent, et repositionne le joueur sur le nouveau spawn.
+     */
+    private void generateFloor(boolean firstFloor) {
+        if (firstFloor && pendingLoad != null) {
+            // L'étage + le layout sauvegardés pilotent la reconstruction du 1er floor.
+            currentLevel = pendingLoad.currentLevel;
+            dungeonMap = SaveManager.toDungeonMap(pendingLoad);
+        } else {
+            DungeonGenerator generator = new DungeonGenerator(50, 40);
+            dungeonMap = generator.generate();
+        }
+        dungeonRenderer = new DungeonRenderer(dungeonMap);
+
+        float threatFactor = getThreatFactor();
+
+        if (firstFloor) {
+            engine = new Engine();
+            engine.addSystem(new DeathSystem());
+            engine.addSystem(new StatsSystem());
+            engine.addSystem(new CombatSystem());
+            engine.addSystem(new PlayerInputSystem());
+            engine.addSystem(new MovementSystem(dungeonMap));
+            engine.addSystem(new RenderSystem(shapeRenderer));
+
+            player          = new Entity();
+            playerTransform = new TransformComponent();
+            if (pendingLoad != null) {
+                // Position exacte restaurée : le layout est identique à celui sauvegardé.
+                playerTransform.x = pendingLoad.playerX;
+                playerTransform.y = pendingLoad.playerY;
+            } else {
+                playerTransform.x = dungeonMap.getSpawnPixelX();
+                playerTransform.y = dungeonMap.getSpawnPixelY();
+            }
+
+            VelocityComponent    playerVel   = new VelocityComponent();
+            RenderComponent      playerRender = new RenderComponent();
+            playerRender.color  = new Color(0.2f, 0.7f, 1.0f, 1f);
+            playerRender.width  = 12f;
+            playerRender.height = 12f;
+
+            PlayerInputComponent playerInput = new PlayerInputComponent();
+            playerInput.speed = 80f;
+
+            playerStats = new PlayerStatsComponent();
+            CombatComponent playerCombat = new CombatComponent();
+
+            InventoryComponent inventory;
+            if (pendingLoad != null) {
+                inventory = SaveManager.toInventory(pendingLoad);
+            } else {
+                inventory = new InventoryComponent();
+                inventory.equipWeapon(ItemGenerator.generateWeapon());
+                inventory.equipArmor(ItemGenerator.generateArmor());
+                inventory.equipCapacity(ItemGenerator.generateCapacity());
+                inventory.equipArtifact(ItemGenerator.generateArtifact());
+            }
+
+            // Synchronise les stats avec l'équipement (généré ou restauré)
+            inventory.updateStats(playerStats.stats);
+
+            if (pendingLoad != null) {
+                // Restaure les PV/Stamina sauvegardés, bornés au maximum actuel
+                // (au cas où l'équipement rechargé donnerait un max différent).
+                playerStats.currentHp      = Math.min(pendingLoad.currentHp, playerStats.stats.maxHp());
+                playerStats.currentStamina = Math.min(pendingLoad.currentStamina, playerStats.stats.maxStamina());
+                pendingLoad = null; // sauvegarde consommée
+            }
+
+            playerCombat.weapon = inventory.weapon;
+
+            player.add(playerTransform);
+            player.add(playerVel);
+            player.add(playerRender);
+            player.add(playerInput);
+            player.add(playerStats);
+            player.add(playerCombat);
+            player.add(inventory);
+            engine.addEntity(player);
+
+            statsOverlay = new StatsOverlay();
+            inventoryOverlay = new InventoryOverlay();
+            miniMap      = new MiniMap();
+            uiCamera     = new OrthographicCamera();
+        } else {
+            // Le joueur, ses stats et son inventaire restent inchangés : seule
+            // sa position est réinitialisée sur le spawn du nouvel étage.
+            playerTransform.x = dungeonMap.getSpawnPixelX();
+            playerTransform.y = dungeonMap.getSpawnPixelY();
+
+            clearFloorEntities();
+            replaceSystem(MovementSystem.class, new MovementSystem(dungeonMap));
+        }
+
+        // Systèmes dépendants de la carte / des entités de l'étage : toujours reconstruits
+        replaceSystem(EnemyMovementSystem.class, new EnemyMovementSystem(dungeonMap, player));
+        replaceSystem(EnemyAttackSystem.class, new EnemyAttackSystem(player));
+        replaceSystem(LootPickupSystem.class,
+            new LootPickupSystem(player, player.getComponent(InventoryComponent.class), playerStats));
+
+        spawnEnemiesForFloor(threatFactor);
+        spawnLootForFloor(threatFactor);
+    }
+
+    /** Remplace un système existant par une nouvelle instance (ex : dépendante de la nouvelle carte). */
+    private <T extends EntitySystem> void replaceSystem(Class<T> type, T newSystem) {
+        T existing = engine.getSystem(type);
+        if (existing != null) {
+            engine.removeSystem(existing);
+        }
+        engine.addSystem(newSystem);
+    }
+
+    /** Retire les ennemis et objets de loot restants de l'étage précédent. */
+    private void clearFloorEntities() {
+        Array<Entity> toRemove = new Array<>();
+        for (Entity e : engine.getEntitiesFor(Family.one(EnemyStatsComponent.class, LootComponent.class).get())) {
+            toRemove.add(e);
+        }
+        for (Entity e : toRemove) {
+            engine.removeEntity(e);
+        }
+    }
+
+    private void spawnEnemiesForFloor(float threatFactor) {
+        int enemyCount = 5 + (currentLevel - 1); // un peu plus d'ennemis par étage
+        for (int i = 0; i < enemyCount; i++) {
+            com.badlogic.gdx.math.Vector2 pos = dungeonMap.getRandomFloorPosition();
+            spawnEnemy(pos.x, pos.y, threatFactor);
+        }
+    }
+
+    private void spawnEnemy(float x, float y, float threatFactor) {
         Entity enemy = new Entity();
 
         TransformComponent transform = new TransformComponent();
@@ -160,11 +265,13 @@ public class GameScreen implements Screen {
         render.height = 12f;
 
         EnemyStatsComponent stats = new EnemyStatsComponent();
+        stats.applyThreatFactor(threatFactor); // HP / DEF / dégâts d'attaque montent avec l'étage
+
         EnemyAIComponent ai = new EnemyAIComponent();
 
-        // Vitesse random mais pas excessive (max 60f, le joueur est à 80f)
-        ai.speed = com.badlogic.gdx.math.MathUtils.random(20f, 50f);
-        ai.pursuitSpeed = ai.speed * 1.2f; // Un peu plus rapide en poursuite, mais reste < 80
+        // Vitesse random mais mise à l'échelle par le threatFactor, bornée pour rester jouable
+        ai.speed = com.badlogic.gdx.math.MathUtils.random(20f, 50f) * threatFactor;
+        ai.pursuitSpeed = Math.min(ai.speed * 1.2f, 140f);
         ai.detectionRange = com.badlogic.gdx.math.MathUtils.random(80f, 150f);
 
         CombatComponent combat = new CombatComponent();
@@ -179,9 +286,59 @@ public class GameScreen implements Screen {
         engine.addEntity(enemy);
     }
 
+    /** Parcourt la carte et fait apparaître un objet au sol sur chaque tile TILE_LOOT. */
+    private void spawnLootForFloor(float threatFactor) {
+        int ts = DungeonMap.TILE_SIZE;
+        for (int r = 0; r < dungeonMap.rows; r++) {
+            for (int c = 0; c < dungeonMap.cols; c++) {
+                if (dungeonMap.getTile(c, r) == DungeonMap.TILE_LOOT) {
+                    spawnLoot(c * ts + ts / 2f, r * ts + ts / 2f, threatFactor);
+                }
+            }
+        }
+    }
+
+    private void spawnLoot(float x, float y, float threatFactor) {
+        Entity lootEntity = new Entity();
+
+        TransformComponent transform = new TransformComponent();
+        transform.x = x;
+        transform.y = y;
+
+        RenderComponent render = new RenderComponent();
+        render.color = new Color(1.0f, 0.85f, 0.2f, 1f); // Doré
+        render.width = 8f;
+        render.height = 8f;
+
+        LootComponent loot = new LootComponent();
+        LootComponent.LootType[] types = LootComponent.LootType.values();
+        loot.type = types[com.badlogic.gdx.math.MathUtils.random(types.length - 1)];
+        loot.threatFactor = threatFactor;
+
+        lootEntity.add(transform);
+        lootEntity.add(render);
+        lootEntity.add(loot);
+
+        engine.addEntity(lootEntity);
+    }
+
+    /** Appelé quand le joueur atteint la tile de sortie (case verte). */
+    private void goToNextFloor() {
+        currentLevel++;
+        generateFloor(false);
+        // Recentre immédiatement la caméra pour éviter un panoramique à travers l'ancien étage
+        camera.position.set(playerTransform.x, playerTransform.y, 0);
+        camera.update();
+        // Checkpoint : sauvegarde automatique à chaque nouvel étage
+        SaveManager.save(currentLevel, dungeonMap, playerTransform, playerStats,
+            player.getComponent(InventoryComponent.class));
+    }
+
     @Override
     public void render(float delta) {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            SaveManager.save(currentLevel, dungeonMap, playerTransform, playerStats,
+                player.getComponent(InventoryComponent.class));
             game.setScreen(new MainMenuScreen(game));
             dispose();
             return;
@@ -198,8 +355,25 @@ public class GameScreen implements Screen {
             engine.getSystem(CombatSystem.class).update(delta);
             engine.getSystem(PlayerInputSystem.class).update(delta);
             engine.getSystem(EnemyMovementSystem.class).update(delta);
+            engine.getSystem(EnemyAttackSystem.class).update(delta);
             engine.getSystem(MovementSystem.class).update(delta);
+            engine.getSystem(LootPickupSystem.class).update(delta);
             engine.getSystem(DeathSystem.class).update(delta);
+
+            // Mort du joueur → écran de game over (permadeath : la sauvegarde est effacée)
+            if (playerStats.isDead) {
+                SaveManager.deleteSave();
+                game.setScreen(new GameOverScreen(game, currentLevel));
+                dispose();
+                return;
+            }
+
+            // Détecte l'arrivée sur la case de sortie (verte) → étage suivant
+            int playerCol = (int) (playerTransform.x / DungeonMap.TILE_SIZE);
+            int playerRow = (int) (playerTransform.y / DungeonMap.TILE_SIZE);
+            if (dungeonMap.getTile(playerCol, playerRow) == DungeonMap.TILE_EXIT) {
+                goToNextFloor();
+            }
         }
 
         // Clamp caméra en tenant compte de la vue étendue

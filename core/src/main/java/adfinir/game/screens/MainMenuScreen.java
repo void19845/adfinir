@@ -1,6 +1,8 @@
 package adfinir.game.screens;
 
 import adfinir.game.Main;
+import adfinir.game.save.SaveData;
+import adfinir.game.save.SaveManager;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
@@ -37,7 +39,22 @@ public class MainMenuScreen implements Screen {
         Label title = new Label("ADFINIR", skin, "subtitle");
         table.add(title).padBottom(40).row();
 
-        TextButton btnPlay = new TextButton("Jouer", skin);
+        boolean hasSave = SaveManager.saveExists();
+
+        if (hasSave) {
+            TextButton btnContinue = new TextButton("Continuer", skin);
+            btnContinue.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    SaveData save = SaveManager.load();
+                    game.setScreen(new GameScreen(game, save));
+                    dispose();
+                }
+            });
+            table.add(btnContinue).width(160).height(40).padBottom(12).row();
+        }
+
+        TextButton btnPlay = new TextButton(hasSave ? "Nouvelle partie" : "Jouer", skin);
         btnPlay.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {

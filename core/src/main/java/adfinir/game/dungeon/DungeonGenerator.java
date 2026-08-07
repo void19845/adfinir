@@ -1,6 +1,7 @@
 package adfinir.game.dungeon;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
@@ -12,6 +13,7 @@ import java.util.Random;
  *  2. On la divise récursivement en deux (horizontal ou vertical).
  *  3. Dans chaque partition feuille, on place une salle aléatoire.
  *  4. On relie les salles sœurs avec des couloirs en L.
+ *  5. On sème quelques tiles de loot sur des cases de sol libres.
  */
 public class DungeonGenerator {
 
@@ -24,6 +26,10 @@ public class DungeonGenerator {
     private static final int CORRIDOR_WIDTH     = 2;   // largeur des couloirs en tiles
     /** Espace minimum (en murs) entre deux couloirs parallèles. */
     private static final int CORRIDOR_SPACING   = 1;
+
+    /** Nombre min/max de tiles de loot générées par étage. */
+    private static final int MIN_LOOT_TILES = 3;
+    private static final int MAX_LOOT_TILES = 8;
 
     private final int cols;
     private final int rows;
@@ -78,6 +84,9 @@ public class DungeonGenerator {
         int exitCol = exitRoom.cx();
         int exitRow = exitRoom.cy();
         grid[exitRow][exitCol] = DungeonMap.TILE_EXIT;
+
+        // Sème quelques tiles de loot sur le reste du sol
+        placeLootTiles(spawnCol, spawnRow, exitCol, exitRow);
 
         return new DungeonMap(grid, spawnCol, spawnRow, exitCol, exitRow);
     }
@@ -289,6 +298,40 @@ public class DungeonGenerator {
         // Recopie dans grid
         for (int r = 0; r < rows; r++)
             grid[r] = copy[r].clone();
+    }
+
+    // ---------------------------------------------------------------
+    // Placement du loot
+    // ---------------------------------------------------------------
+
+    /**
+     * Sème aléatoirement des tiles TILE_LOOT sur des cases de sol libres
+     * (hors spawn et sortie). Le nombre de tiles est fixe par étage ;
+     * la qualité de l'objet généré dessus dépend du threatFactor,
+     * appliqué au moment du spawn dans GameScreen.
+     */
+    private void placeLootTiles(int spawnCol, int spawnRow, int exitCol, int exitRow) {
+        List<int[]> candidates = new ArrayList<>();
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                boolean isSpawn = (c == spawnCol && r == spawnRow);
+                boolean isExit  = (c == exitCol && r == exitRow);
+                if (grid[r][c] == DungeonMap.TILE_FLOOR && !isSpawn && !isExit) {
+                    candidates.add(new int[]{c, r});
+                }
+            }
+        }
+        if (candidates.isEmpty()) return;
+
+        Collections.shuffle(candidates, rng);
+
+        int count = MIN_LOOT_TILES + rng.nextInt(MAX_LOOT_TILES - MIN_LOOT_TILES + 1);
+        count = Math.min(count, candidates.size());
+
+        for (int i = 0; i < count; i++) {
+            int[] cell = candidates.get(i);
+            grid[cell[1]][cell[0]] = DungeonMap.TILE_LOOT;
+        }
     }
 
     // ---------------------------------------------------------------
