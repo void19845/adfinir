@@ -9,6 +9,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Clean build artifacts: `./gradlew clean`
 - Create runnable JAR for desktop: `./gradlew lwjgl3:jar`
 
+## Contribution Guidelines
+To contribute to this project, please follow these guidelines:
+1. **Fork the Repository**: Fork the repository on GitHub.
+2. **Create a New Branch**: Create a new branch for your changes.
+3. **Make Changes**: Make your changes in the new branch.
+4. **Commit Changes**: Commit your changes with descriptive commit messages.
+5. **Push Changes**: Push your changes to your forked repository.
+6. **Create a Pull Request**: Create a pull request from your forked repository to the main repository.
+
 ## Project Architecture
 This is a libGDX project using a multi-module Gradle structure.
 - `core`: Contains the main application logic, game state, and shared resources.
