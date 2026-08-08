@@ -8,6 +8,12 @@ import java.util.Random;
 public class ItemGenerator {
     private static final Random rand = new Random();
 
+    /** Chance qu'un socket vide généré procéduralement soit pré-équipé d'un mod. */
+    private static final float SOCKET_PREFILL_CHANCE = 0.2f;
+
+    private static final String[] WEAPON_MOD_IDS = { "COMBO_BRUTAL", "COMBO_RAFALE" };
+    private static final String[] CAPACITY_MOD_IDS = { "EFFECT_GLACE", "EFFECT_FOUDRE" };
+
     public static Weapon generateWeapon() {
         return generateWeapon(1f);
     }
@@ -36,6 +42,13 @@ public class ItemGenerator {
                 30f
             ));
         }
+
+        for (int i = 0; i < weapon.getSocketCount(); i++) {
+            if (rand.nextFloat() < SOCKET_PREFILL_CHANCE) {
+                String id = WEAPON_MOD_IDS[rand.nextInt(WEAPON_MOD_IDS.length)];
+                weapon.setSocket(i, createModifierById(id, rarity));
+            }
+        }
         return weapon;
     }
 
@@ -59,6 +72,13 @@ public class ItemGenerator {
                 CapacityModifier.ModType.values()[rand.nextInt(CapacityModifier.ModType.values().length)],
                 1.0f
             ));
+        }
+
+        for (int i = 0; i < cap.getSocketCount(); i++) {
+            if (rand.nextFloat() < SOCKET_PREFILL_CHANCE) {
+                String id = CAPACITY_MOD_IDS[rand.nextInt(CAPACITY_MOD_IDS.length)];
+                cap.setSocket(i, createModifierById(id, rarity));
+            }
         }
         return cap;
     }
@@ -95,6 +115,52 @@ public class ItemGenerator {
                 return new Artifact(name, rarity, passiveEffectId, (obj) -> {
                     // Logique de l'effet passif
                 });
+        }
+    }
+
+    /**
+     * Génère un ItemModifier isolé (loot autonome, ex: apparaît sur une tile
+     * TILE_LOOT). Choisit aléatoirement entre un mod d'arme et un mod de
+     * capacité.
+     */
+    public static ItemModifier generateModifier(float threatFactor) {
+        Rarity rarity = getRandomRarity(threatFactor);
+        boolean weaponMod = rand.nextBoolean();
+        String[] pool = weaponMod ? WEAPON_MOD_IDS : CAPACITY_MOD_IDS;
+        String id = pool[rand.nextInt(pool.length)];
+        return createModifierById(id, rarity);
+    }
+
+    /**
+     * Reconstruit un ItemModifier à partir de son modifierId. Seule source de
+     * vérité pour l'association id -> définition (WeaponAttack / CapacityEffect
+     * / CapacityModifier concrets), utilisée à la fois par la génération
+     * procédurale et par SaveManager lors du chargement d'une sauvegarde.
+     */
+    public static ItemModifier createModifierById(String modifierId, Rarity rarity) {
+        switch (modifierId) {
+            case "COMBO_BRUTAL":
+                return new WeaponComboMod(modifierId, "Combo Brutal", rarity, java.util.Arrays.asList(
+                    new WeaponAttack("Coup Brutal",
+                        15f * rarity.statMultiplier, 25f * rarity.statMultiplier,
+                        0.6f, 0.2f, 0.15f, null, 35f)
+                ));
+            case "COMBO_RAFALE":
+                return new WeaponComboMod(modifierId, "Combo Rafale", rarity, java.util.Arrays.asList(
+                    new WeaponAttack("Frappe Rapide",
+                        5f * rarity.statMultiplier, 10f * rarity.statMultiplier,
+                        0.25f, 0.1f, 0.05f, null, 20f)
+                ));
+            case "EFFECT_GLACE":
+                return new CapacityEffectMod(modifierId, "Éclat de Glace", rarity,
+                    new CapacityEffect("Éclat de Glace", 12f * rarity.statMultiplier, 250f, 40f, "ICE"),
+                    null);
+            case "EFFECT_FOUDRE":
+                return new CapacityEffectMod(modifierId, "Décharge", rarity,
+                    null,
+                    new CapacityModifier(CapacityModifier.ModType.RICOCHET, 1.0f));
+            default:
+                return null;
         }
     }
 

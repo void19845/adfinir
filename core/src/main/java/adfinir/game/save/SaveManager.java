@@ -11,6 +11,7 @@ import adfinir.game.inventory.Capacity;
 import adfinir.game.inventory.CapacityEffect;
 import adfinir.game.inventory.CapacityModifier;
 import adfinir.game.inventory.ItemGenerator;
+import adfinir.game.inventory.ItemModifier;
 import adfinir.game.inventory.Rarity;
 import adfinir.game.inventory.Weapon;
 import adfinir.game.inventory.WeaponAttack;
@@ -119,6 +120,9 @@ public class SaveManager {
             as.areaOfEffect = atk.areaOfEffect;
             s.combos.add(as);
         }
+        for (int i = 0; i < w.getSocketCount(); i++) {
+            s.sockets.add(toSocketSave(w.getSocket(i)));
+        }
         return s;
     }
 
@@ -128,6 +132,11 @@ public class SaveManager {
         for (SaveData.AttackSave as : s.combos) {
             w.addAttack(new WeaponAttack(as.name, as.minDamage, as.maxDamage,
                 as.cooldown, as.duration, as.knockback, as.element, as.areaOfEffect));
+        }
+        if (s.sockets != null) {
+            for (int i = 0; i < s.sockets.size() && i < w.getSocketCount(); i++) {
+                w.setSocket(i, fromSocketSave(s.sockets.get(i)));
+            }
         }
         return w;
     }
@@ -172,6 +181,9 @@ public class SaveManager {
             ms.intensity = m.intensity;
             s.modifiers.add(ms);
         }
+        for (int i = 0; i < c.getSocketCount(); i++) {
+            s.sockets.add(toSocketSave(c.getSocket(i)));
+        }
         return s;
     }
 
@@ -183,7 +195,30 @@ public class SaveManager {
         for (SaveData.ModifierSave ms : s.modifiers) {
             c.addModifier(new CapacityModifier(CapacityModifier.ModType.valueOf(ms.type), ms.intensity));
         }
+        if (s.sockets != null) {
+            for (int i = 0; i < s.sockets.size() && i < c.getSocketCount(); i++) {
+                c.setSocket(i, fromSocketSave(s.sockets.get(i)));
+            }
+        }
         return c;
+    }
+
+    // ------------------------------------------------------------------
+    // Sockets (ItemModifier) — partagé Weapon / Capacity
+    // ------------------------------------------------------------------
+
+    private static SaveData.SocketSave toSocketSave(ItemModifier mod) {
+        SaveData.SocketSave ss = new SaveData.SocketSave();
+        if (mod != null) {
+            ss.modifierId = mod.modifierId;
+            ss.rarity = mod.rarity.name();
+        }
+        return ss;
+    }
+
+    private static ItemModifier fromSocketSave(SaveData.SocketSave ss) {
+        if (ss == null || ss.modifierId == null) return null;
+        return ItemGenerator.createModifierById(ss.modifierId, Rarity.valueOf(ss.rarity));
     }
 
     // ------------------------------------------------------------------

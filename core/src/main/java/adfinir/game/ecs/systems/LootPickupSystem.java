@@ -8,6 +8,7 @@ import adfinir.game.inventory.Armor;
 import adfinir.game.inventory.Capacity;
 import adfinir.game.inventory.Item;
 import adfinir.game.inventory.ItemGenerator;
+import adfinir.game.inventory.ItemModifier;
 import adfinir.game.inventory.Weapon;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
@@ -86,6 +87,7 @@ public class LootPickupSystem extends IteratingSystem {
             case ARMOR:    return ItemGenerator.generateArmor(loot.threatFactor);
             case CAPACITY: return ItemGenerator.generateCapacity(loot.threatFactor);
             case ARTIFACT: return ItemGenerator.generateArtifact(loot.threatFactor);
+            case MODIFIER: return ItemGenerator.generateModifier(loot.threatFactor);
             default:       return null;
         }
     }
@@ -120,6 +122,7 @@ public class LootPickupSystem extends IteratingSystem {
         if (item instanceof Weapon)   return LootComponent.LootType.WEAPON;
         if (item instanceof Armor)    return LootComponent.LootType.ARMOR;
         if (item instanceof Capacity) return LootComponent.LootType.CAPACITY;
+        if (item instanceof ItemModifier) return LootComponent.LootType.MODIFIER;
         return LootComponent.LootType.ARTIFACT;
     }
 }

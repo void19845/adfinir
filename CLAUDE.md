@@ -9,6 +9,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Clean build artifacts: `./gradlew clean`
 - Create runnable JAR for desktop: `./gradlew lwjgl3:jar`
 
+## Coding Guidelines
+### General Principles
+- **Before Any Action**: Verify required files; zero assumptions; stop and ask if data is missing or ambiguous.
+- **Communication**: Tight responses (bullet points/short sentences), no preambles, no unnecessary conclusions.
+- **Before Coding**: State assumptions explicitly; surface tradeoffs; stop if unclear.
+- **While Coding**: Minimum code that solves the problem; no speculative features or over-abstraction.
+- **Surgical Changes**: Touch only what is requested; match existing style; no unrequested refactors.
+- **Goal-Driven Execution**: Transform tasks into verifiable goals; provide brief plans with checkpoints.
+
 ## Project Architecture
 This is a libGDX project using a multi-module Gradle structure.
 - `core`: Contains the main application logic, game state, and shared resources.

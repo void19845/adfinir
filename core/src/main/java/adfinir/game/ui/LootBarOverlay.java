@@ -5,6 +5,7 @@ import adfinir.game.ecs.components.InventoryComponent;
 import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
 import adfinir.game.inventory.Item;
+import adfinir.game.inventory.ItemModifier;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
@@ -22,12 +23,18 @@ import java.util.List;
  *
  * - Cercle en surbrillance (contour jaune) = sélection actuelle. Cible du swap
  *   au sol [F] (voir LootPickupSystem) et valeur par défaut = le premier cercle.
- * - Sélection : touches [1]-[8], ou clic gauche sur un cercle. Les deux actions
- *   équipent immédiatement l'item (échange avec l'équipement actuel du même type,
- *   qui revient dans ce même cercle) — logique centralisée dans
- *   InventoryComponent.equipFromBarAndSync().
+ * - Sélection : touches [1]-[8], ou clic gauche sur un cercle.
+ *   - Item standard (Weapon/Capacity/Armor/Artifact) : équipe immédiatement
+ *     (échange avec l'équipement actuel du même type, qui revient dans ce même
+ *     cercle) — logique centralisée dans InventoryComponent.equipFromBarAndSync().
+ *   - ItemModifier : ne s'équipe jamais directement (les 4 slots n'acceptent
+ *     pas les mods). Le clic le "tient en main" (SocketInteractionState) en vue
+ *     de son implantation dans un socket via InventoryOverlay.
  * - Survol souris : infobulle avec le nom et les détails de l'item (stats /
- *   combos / capacité), réutilise ItemDetails (partagé avec InventoryOverlay).
+ *   combos / capacité / sockets), réutilise ItemDetails (partagé avec
+ *   InventoryOverlay). Le survol d'un ItemModifier alimente aussi
+ *   SocketInteractionState.hoverPreviewMod, pour que InventoryOverlay puisse
+ *   surligner en vert les sockets compatibles pendant le survol.
  */
 public class LootBarOverlay implements Disposable {
 
@@ -35,6 +42,7 @@ public class LootBarOverlay implements Disposable {
     private static final float RADIUS       = 18f;
     private static final float SPACING      = 46f;
     private static final float TOP_MARGIN   = 30f;
+    private static final float DETAIL_SCALE    = 1.0f;
 
     private final SpriteBatch   batch;
     private final BitmapFont    font;
@@ -42,25 +50,28 @@ public class LootBarOverlay implements Disposable {
 
     private int screenW, screenH;
 
-    private LootBarComponent     bar;
-    private InventoryComponent   inventory;
-    private CombatComponent      combat;
-    private PlayerStatsComponent playerStats;
+    private LootBarComponent      bar;
+    private InventoryComponent    inventory;
+    private CombatComponent       combat;
+    private PlayerStatsComponent  playerStats;
+    private SocketInteractionState interaction;
 
     public LootBarOverlay() {
         batch  = new SpriteBatch();
         font   = new BitmapFont();
-        font.getData().setScale(0.8f);
+        font.getData().setScale(DETAIL_SCALE);
         shapes = new ShapeRenderer();
     }
 
     /** À rafraîchir chaque frame avec les références courantes du joueur. */
     public void update(LootBarComponent bar, InventoryComponent inventory,
-                       CombatComponent combat, PlayerStatsComponent playerStats) {
+                       CombatComponent combat, PlayerStatsComponent playerStats,
+                       SocketInteractionState interaction) {
         this.bar = bar;
         this.inventory = inventory;
         this.combat = combat;
         this.playerStats = playerStats;
+        this.interaction = interaction;
     }
 
     /**
@@ -73,19 +84,27 @@ public class LootBarOverlay implements Disposable {
         for (int i = 0; i < CIRCLE_COUNT; i++) {
             int key = Input.Keys.NUM_1 + i;
             if (Gdx.input.isKeyJustPressed(key)) {
-                equip(i);
+                select(i);
                 break;
             }
         }
 
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             int hovered = hoveredIndex();
-            if (hovered >= 0) equip(hovered);
+            if (hovered >= 0) select(hovered);
         }
     }
 
-    private void equip(int index) {
-        if (bar.slots[index] == null) return; // cercle vide : rien à équiper
+    /** Équipe (item standard) ou tient en main (ItemModifier) le slot cliqué/sélectionné au clavier. */
+    private void select(int index) {
+        Item item = bar.slots[index];
+        if (item == null) return;
+
+        if (item instanceof ItemModifier) {
+            bar.selectedIndex = index;
+            if (interaction != null) interaction.holdFromLootBar((ItemModifier) item, index);
+            return;
+        }
         inventory.equipFromBarAndSync(bar, index, combat, playerStats.stats);
     }
 
@@ -123,6 +142,12 @@ public class LootBarOverlay implements Disposable {
         float cy = circleY();
         int hovered = hoveredIndex();
 
+        // Survol d'un mod : alimente l'aperçu de compatibilité consommé par InventoryOverlay.
+        if (interaction != null) {
+            Item hoveredItem = hovered >= 0 ? bar.slots[hovered] : null;
+            interaction.hoverPreviewMod = (hoveredItem instanceof ItemModifier) ? (ItemModifier) hoveredItem : null;
+        }
+
         // Disques : fond + couleur de rareté (ou gris si vide)
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (int i = 0; i < CIRCLE_COUNT; i++) {
@@ -137,24 +162,42 @@ public class LootBarOverlay implements Disposable {
         }
         shapes.end();
 
-        // Contours : jaune pour le slot sélectionné, gris sinon
+        // Contours : jaune pour le slot sélectionné/tenu, doré/argenté selon le type d'item, gris si vide
         shapes.begin(ShapeRenderer.ShapeType.Line);
         for (int i = 0; i < CIRCLE_COUNT; i++) {
             float cx = startX + i * SPACING;
-            boolean selected = (i == bar.selectedIndex);
-            shapes.setColor(selected ? Color.YELLOW : Color.GRAY);
+            Item item = bar.slots[i];
+            boolean isHeldSource = interaction != null && interaction.heldFromLootBarIndex == i;
+            boolean selected = (i == bar.selectedIndex) || isHeldSource;
+
+            Color borderColor;
+            if (selected) {
+                borderColor = Color.YELLOW;
+            } else if (item == null) {
+                borderColor = Color.GRAY;
+            } else if (item instanceof ItemModifier) {
+                borderColor = ItemDetails.MOD_BORDER_COLOR;
+            } else {
+                borderColor = ItemDetails.STANDARD_BORDER_COLOR;
+            }
+            shapes.setColor(borderColor);
             shapes.circle(cx, cy, RADIUS + (selected ? 4f : 0f), 24);
         }
         shapes.end();
 
         batch.begin();
 
-        // Numéro de raccourci (1-8) sous chaque cercle
-        font.getData().setScale(0.8f);
-        font.setColor(Color.WHITE);
+        // Numéro de raccourci (1-8) sous chaque cercle + symbole ◈ sur les mods
+        font.getData().setScale(DETAIL_SCALE);
         for (int i = 0; i < CIRCLE_COUNT; i++) {
             float cx = startX + i * SPACING;
+            font.setColor(Color.WHITE);
             font.draw(batch, String.valueOf(i + 1), cx - 4, cy - RADIUS - 4);
+
+            if (bar.slots[i] instanceof ItemModifier) {
+                font.setColor(ItemDetails.MOD_BORDER_COLOR);
+                font.draw(batch, "\u25C8", cx - 4, cy + 5); // ◈ overlay sur l'icône
+            }
         }
 
         if (hovered >= 0 && bar.slots[hovered] != null) {

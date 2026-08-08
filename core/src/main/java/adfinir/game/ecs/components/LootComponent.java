@@ -10,7 +10,7 @@ import com.badlogic.ashley.core.Component;
  * le loot a été semé.
  */
 public class LootComponent implements Component {
-    public enum LootType { WEAPON, ARMOR, CAPACITY, ARTIFACT }
+    public enum LootType { WEAPON, ARMOR, CAPACITY, ARTIFACT, MODIFIER }
 
     public LootType type;
     public float threatFactor = 1f;

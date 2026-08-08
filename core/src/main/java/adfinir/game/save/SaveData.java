@@ -52,6 +52,14 @@ public class SaveData {
         public String rarity;   // Rarity.name()
         public String type;     // WeaponType.name()
         public List<AttackSave> combos = new ArrayList<>();
+        /** Un élément par socket (dans l'ordre), modifierId==null si le socket est vide. */
+        public List<SocketSave> sockets = new ArrayList<>();
+    }
+
+    /** Un mod implanté dans un socket, identifié par son id (reconstruit via ItemGenerator.createModifierById). */
+    public static class SocketSave {
+        public String modifierId; // null si socket vide
+        public String rarity;     // Rarity.name(), null si socket vide
     }
 
     public static class AttackSave {
@@ -80,6 +88,8 @@ public class SaveData {
         public float effectRadius;
         public String effectType;
         public List<ModifierSave> modifiers = new ArrayList<>();
+        /** Un élément par socket (dans l'ordre), modifierId==null si le socket est vide. */
+        public List<SocketSave> sockets = new ArrayList<>();
     }
 
     public static class ModifierSave {

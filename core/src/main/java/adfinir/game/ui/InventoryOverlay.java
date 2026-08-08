@@ -2,7 +2,10 @@ package adfinir.game.ui;
 
 import adfinir.game.inventory.*;
 import adfinir.game.ecs.components.InventoryComponent;
+import adfinir.game.ecs.components.LootBarComponent;
+import adfinir.game.player.StatSheet;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -25,6 +28,16 @@ import java.util.List;
  *  - Armure / Artéfact  : bonus de stats (+X PV Max, +X DEF, ...)
  *  - Arme               : liste des combos (dégâts, cooldown)
  *  - Capacité           : effet principal + modificateurs
+ *
+ * Sockets (arme / capacité) : cliquer sur la ligne Arme ou Capacité la
+ * sélectionne (contour cyan) et affiche ses sockets en petits carrés dans la
+ * bande basse du slot. Flux d'interaction (voir SocketInteractionState) :
+ *  - clic sur un socket occupé, rien tenu en main  -> le tient en main (jaune)
+ *  - clic sur un socket vide compatible, tenant     -> implante
+ *  - clic sur un socket occupé compatible, tenant   -> échange
+ *  - clic droit ou [R] sur un socket                -> extrait vers la loot bar
+ *  - [Échap] (géré par GameScreen)                  -> annule le mod tenu
+ * Survol d'un mod dans la LootBarOverlay -> sockets compatibles surlignés vert.
  */
 public class InventoryOverlay implements Disposable {
 
@@ -34,6 +47,12 @@ public class InventoryOverlay implements Disposable {
 
     private boolean visible = false;
     private InventoryComponent currentInventory;
+    private LootBarComponent bar;
+    private StatSheet stats;
+    private SocketInteractionState interaction;
+
+    /** Slot actuellement sélectionné pour l'affichage des sockets (0=Arme, 1=Capacité), -1 = aucun. */
+    private int selectedSlotIndex = -1;
 
     // --- Mise en page ---
     private static final float MARGIN     = 20f;
@@ -48,8 +67,12 @@ public class InventoryOverlay implements Disposable {
 
     private static final float DETAIL_W        = 280f; // largeur du panneau de détails
     private static final float DETAIL_LINE_H   = 13f;
-    private static final float DETAIL_SCALE    = 0.8f;
+    private static final float DETAIL_SCALE    = 1.0f;
     private static final int   DETAIL_MAX_LINES = 5;   // sécurité anti-débordement du slot
+
+    // --- Sockets ---
+    private static final float SOCKET_SIZE = 16f;
+    private static final float SOCKET_GAP  = 4f;
 
     private static final float BOX_W =
         PADDING + SLOT_W + PADDING + DETAIL_W + PADDING;
@@ -72,13 +95,124 @@ public class InventoryOverlay implements Disposable {
 
     public void toggle() {
         visible = !visible;
+        if (!visible) selectedSlotIndex = -1;
     }
 
     public boolean isVisible() { return visible; }
 
-    public void update(InventoryComponent inventory) {
-        this.currentInventory = inventory;
+    /** Annule le mod tenu en main (appelé par GameScreen sur [Échap] quand un mod est tenu). */
+    public void cancelHeld() {
+        if (interaction != null) interaction.clear();
     }
+
+    public boolean isHoldingMod() {
+        return interaction != null && interaction.isHolding();
+    }
+
+    public void update(InventoryComponent inventory, LootBarComponent bar, StatSheet stats,
+                       SocketInteractionState interaction) {
+        this.currentInventory = inventory;
+        this.bar = bar;
+        this.stats = stats;
+        this.interaction = interaction;
+    }
+
+    // ------------------------------------------------------------------
+    // Input
+    // ------------------------------------------------------------------
+
+    public void handleInput() {
+        if (!visible || currentInventory == null) return;
+
+        boolean leftClick  = Gdx.input.isButtonJustPressed(Input.Buttons.LEFT);
+        boolean rightClick = Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT);
+        boolean rKey       = Gdx.input.isKeyJustPressed(Input.Keys.R);
+        if (!leftClick && !rightClick && !rKey) return;
+
+        int screenH = Gdx.graphics.getHeight();
+        float boxY = (screenH - BOX_H) / 2f;
+        float slotX = MARGIN + PADDING;
+        float firstSlotTop = boxY + BOX_H - PADDING - HEADER_H - PADDING;
+
+        float mx = Gdx.input.getX();
+        float my = screenH - Gdx.input.getY();
+
+        // 1) Clic/R/clic-droit sur un socket du slot sélectionné (Arme=0 / Capacité=1 uniquement)
+        if (selectedSlotIndex == 0 || selectedSlotIndex == 1) {
+            Item hostItem = selectedSlotIndex == 0 ? currentInventory.weapon : currentInventory.capacity;
+            if (hostItem != null) {
+                float slotY = firstSlotTop - selectedSlotIndex * (SLOT_H + SLOT_GAP) - SLOT_H;
+                int count = socketCountOf(hostItem);
+                for (int s = 0; s < count; s++) {
+                    float sx = slotX + 6 + s * (SOCKET_SIZE + SOCKET_GAP);
+                    float sy = slotY + 4;
+                    if (mx >= sx && mx <= sx + SOCKET_SIZE && my >= sy && my <= sy + SOCKET_SIZE) {
+                        if (rightClick || rKey) {
+                            extractSocket(hostItem, s);
+                        } else {
+                            clickSocket(hostItem, s);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 2) Clic gauche sur une ligne de slot -> sélection (Arme/Capacité) ou désélection
+        if (leftClick) {
+            for (int i = 0; i < SLOT_COUNT; i++) {
+                float slotY = firstSlotTop - i * (SLOT_H + SLOT_GAP) - SLOT_H;
+                if (mx >= slotX && mx <= slotX + SLOT_W && my >= slotY && my <= slotY + SLOT_H) {
+                    selectedSlotIndex = (i == 0 || i == 1) ? (selectedSlotIndex == i ? -1 : i) : -1;
+                    return;
+                }
+            }
+        }
+    }
+
+    private void clickSocket(Item hostItem, int socketIndex) {
+        if (interaction == null) return;
+        ItemModifier occupant = socketOf(hostItem, socketIndex);
+
+        if (!interaction.isHolding()) {
+            if (occupant != null) interaction.holdFromSocket(occupant, hostItem, socketIndex);
+            return; // clic sur socket vide sans rien tenir : no-op
+        }
+
+        boolean ok;
+        if (interaction.heldFromLootBarIndex >= 0) {
+            ok = currentInventory.implantFromLootBarAndSync(hostItem, socketIndex, bar, interaction.heldFromLootBarIndex, stats);
+        } else if (interaction.heldFromItem != null) {
+            ok = currentInventory.swapSocketsAndSync(interaction.heldFromItem, interaction.heldFromSocketIndex, hostItem, socketIndex, stats);
+        } else {
+            ok = false;
+        }
+        if (ok) interaction.clear();
+    }
+
+    private void extractSocket(Item hostItem, int socketIndex) {
+        if (bar == null) return;
+        currentInventory.extractToLootBarAndSync(hostItem, socketIndex, bar, stats);
+        if (interaction != null && interaction.heldFromItem == hostItem && interaction.heldFromSocketIndex == socketIndex) {
+            interaction.clear();
+        }
+    }
+
+    private ItemModifier socketOf(Item item, int index) {
+        if (item instanceof Weapon) return ((Weapon) item).getSocket(index);
+        if (item instanceof Capacity) return ((Capacity) item).getSocket(index);
+        return null;
+    }
+
+    private int socketCountOf(Item item) {
+        if (item instanceof Weapon) return ((Weapon) item).getSocketCount();
+        if (item instanceof Capacity) return ((Capacity) item).getSocketCount();
+        return 0;
+    }
+
+    // ------------------------------------------------------------------
+    // Rendu
+    // ------------------------------------------------------------------
 
     public void draw() {
         if (!visible || currentInventory == null) return;
@@ -102,15 +236,25 @@ public class InventoryOverlay implements Disposable {
         // Y du haut du premier slot (juste sous le titre)
         float firstSlotTop = boxY + BOX_H - PADDING - HEADER_H - PADDING;
 
-        // Cadres des 4 slots
+        // Cadres des 4 slots (cyan pour le slot sélectionné)
         shapes.begin(ShapeRenderer.ShapeType.Line);
-        shapes.setColor(Color.GRAY);
         for (int i = 0; i < SLOT_COUNT; i++) {
             float slotY = firstSlotTop - i * (SLOT_H + SLOT_GAP) - SLOT_H;
+            shapes.setColor(i == selectedSlotIndex ? Color.CYAN : Color.GRAY);
             shapes.rect(slotX, slotY, SLOT_W, SLOT_H);
+            shapes.setColor(Color.GRAY);
             shapes.rect(detailX, slotY, DETAIL_W, SLOT_H);
         }
         shapes.end();
+
+        // Sockets du slot sélectionné (avant batch.begin() : ShapeRenderer/SpriteBatch ne s'interleavent pas)
+        if (selectedSlotIndex == 0 || selectedSlotIndex == 1) {
+            Item hostItem = selectedSlotIndex == 0 ? currentInventory.weapon : currentInventory.capacity;
+            if (hostItem != null) {
+                float slotY = firstSlotTop - selectedSlotIndex * (SLOT_H + SLOT_GAP) - SLOT_H;
+                drawSocketShapes(hostItem, slotX, slotY);
+            }
+        }
 
         batch.begin();
 
@@ -134,9 +278,73 @@ public class InventoryOverlay implements Disposable {
 
         // Pied de page
         font.setColor(Color.LIGHT_GRAY);
-        font.draw(batch, "[E] fermer l'inventaire", slotX, boxY + PADDING + FOOTER_H);
+        String footer = isHoldingMod()
+            ? "[clic] implanter/échanger — [Échap] annuler"
+            : "[E] fermer l'inventaire — [clic] sélectionner Arme/Capacité";
+        font.draw(batch, footer, slotX, boxY + PADDING + FOOTER_H);
 
         batch.end();
+    }
+
+    /** Fonds + contours des sockets du slot sélectionné. Doit être appelé AVANT batch.begin(). */
+    private void drawSocketShapes(Item hostItem, float slotX, float slotY) {
+        int count = socketCountOf(hostItem);
+        if (count == 0) return;
+
+        ItemModifier previewMod = interaction != null ? interaction.compatibilityPreviewMod() : null;
+        boolean previewCompatible = previewMod != null && previewMod.isCompatibleWith(hostItem);
+
+        float baseX = slotX + 6;
+        float baseY = slotY + 4;
+
+        // Fonds (mods occupant un socket)
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for (int s = 0; s < count; s++) {
+            ItemModifier occupant = socketOf(hostItem, s);
+            if (occupant == null) continue;
+            float sx = baseX + s * (SOCKET_SIZE + SOCKET_GAP);
+            shapes.setColor(occupant instanceof WeaponComboMod
+                ? new Color(0.75f, 0.2f, 0.2f, 0.85f)   // rouge : combo offensif
+                : new Color(0.2f, 0.4f, 0.85f, 0.85f)); // bleu : effet magique
+            shapes.rect(sx, baseY, SOCKET_SIZE, SOCKET_SIZE);
+        }
+        shapes.end();
+
+        // Contours (jaune = tenu, vert = cible compatible en survol/tenue, sinon rareté/gris)
+        for (int s = 0; s < count; s++) {
+            float sx = baseX + s * (SOCKET_SIZE + SOCKET_GAP);
+            ItemModifier occupant = socketOf(hostItem, s);
+            boolean isHeldSource = interaction != null && interaction.heldFromItem == hostItem
+                && interaction.heldFromSocketIndex == s;
+
+            Color border;
+            if (isHeldSource) border = Color.YELLOW;
+            else if (previewCompatible) border = Color.GREEN;
+            else if (occupant != null) border = ItemDetails.rarityColor(occupant.rarity);
+            else border = Color.GRAY;
+
+            shapes.begin(ShapeRenderer.ShapeType.Line);
+            shapes.setColor(border);
+            if (occupant == null) {
+                drawDashedRect(sx, baseY, SOCKET_SIZE, SOCKET_SIZE);
+            } else {
+                shapes.rect(sx, baseY, SOCKET_SIZE, SOCKET_SIZE);
+            }
+            shapes.end();
+        }
+    }
+
+    /** Contour pointillé (ShapeRenderer ne supporte pas les traits en tirets nativement). */
+    private void drawDashedRect(float x, float y, float w, float h) {
+        float dash = 3f;
+        for (float dx = 0; dx < w; dx += dash * 2) {
+            shapes.line(x + dx, y, x + Math.min(dx + dash, w), y);
+            shapes.line(x + dx, y + h, x + Math.min(dx + dash, w), y + h);
+        }
+        for (float dy = 0; dy < h; dy += dash * 2) {
+            shapes.line(x, y + dy, x, y + Math.min(dy + dash, h));
+            shapes.line(x + w, y + dy, x + w, y + Math.min(dy + dash, h));
+        }
     }
 
     private void drawSlotContent(SpriteBatch batch, float x, float y, String label, Item item) {
@@ -178,7 +386,7 @@ public class InventoryOverlay implements Disposable {
 
     /**
      * Panneau de détails à droite du slot : stats (Armure/Artéfact),
-     * combos (Arme) ou effet + modificateurs (Capacité).
+     * combos + sockets (Arme) ou effet + modificateurs + sockets (Capacité).
      */
     private void drawDetailPanel(SpriteBatch batch, float x, float slotY, Item item) {
         if (item == null) return;

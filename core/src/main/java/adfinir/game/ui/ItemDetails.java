@@ -16,9 +16,19 @@ public final class ItemDetails {
 
     private ItemDetails() {}
 
+    /** Bordure des mods (ItemModifier) dans la loot bar — spec §2.3. */
+    public static final Color MOD_BORDER_COLOR = new Color(1f, 0.84f, 0f, 1f); // doré
+    /** Bordure des items standard (Weapon/Capacity/Armor/Artifact) dans la loot bar. */
+    public static final Color STANDARD_BORDER_COLOR = new Color(0.75f, 0.75f, 0.78f, 1f); // argenté
+
     public static List<String> buildDetailLines(Item item) {
         List<String> lines = new ArrayList<>();
         if (item == null) return lines;
+
+        if (item instanceof ItemModifier) {
+            lines.addAll(buildModifierLines((ItemModifier) item));
+            return lines;
+        }
 
         if (item instanceof Weapon) {
             Weapon w = (Weapon) item;
@@ -32,6 +42,7 @@ public final class ItemDetails {
             if (w.comboSlots.size() > shown) {
                 lines.add("... +" + (w.comboSlots.size() - shown) + " autre(s)");
             }
+            appendSocketLines(lines, w.getSocketCount(), w::getSocket);
 
         } else if (item instanceof Capacity) {
             Capacity c = (Capacity) item;
@@ -48,6 +59,7 @@ public final class ItemDetails {
             if (c.modifiers.size() > shown) {
                 lines.add("... +" + (c.modifiers.size() - shown) + " autre(s)");
             }
+            appendSocketLines(lines, c.getSocketCount(), c::getSocket);
 
         } else {
             // Armure / Artéfact : bonus de stats
@@ -57,6 +69,63 @@ public final class ItemDetails {
                 if (v != null && v != 0f) {
                     lines.add(String.format("+%.1f %s", v, statLabel(t)));
                 }
+            }
+        }
+
+        return lines;
+    }
+
+    /** Section "Sockets" commune à Weapon et Capacity : "[1] VIDE" ou "[1] <résumé du mod>". */
+    private static void appendSocketLines(List<String> lines, int socketCount, java.util.function.IntFunction<ItemModifier> getSocket) {
+        if (socketCount == 0) return;
+        lines.add("Sockets :");
+        for (int i = 0; i < socketCount; i++) {
+            ItemModifier mod = getSocket.apply(i);
+            lines.add(mod == null
+                ? String.format("[%d] VIDE", i + 1)
+                : String.format("[%d] %s", i + 1, modifierSummary(mod)));
+        }
+    }
+
+    /** Résumé une ligne d'un mod, utilisé dans la liste des sockets d'un item hôte. */
+    private static String modifierSummary(ItemModifier mod) {
+        if (mod instanceof WeaponComboMod) {
+            WeaponComboMod wcm = (WeaponComboMod) mod;
+            return mod.name + " (+" + wcm.comboAttacks.size() + " attaque(s))";
+        }
+        return mod.name;
+    }
+
+    /**
+     * Détails d'un ItemModifier lui-même (survol dans la loot bar) :
+     * "Modificateur d'arme — Combo : ..." ou "Modificateur de capacité — Effet : ...".
+     */
+    private static List<String> buildModifierLines(ItemModifier mod) {
+        List<String> lines = new ArrayList<>();
+
+        if (mod instanceof WeaponComboMod) {
+            WeaponComboMod wcm = (WeaponComboMod) mod;
+            lines.add("Modificateur d'arme — Combo :");
+            for (WeaponAttack a : wcm.comboAttacks) {
+                lines.add(String.format("%s  %.0f-%.0f dgt (cd %.2fs)", a.name, a.minDamage, a.maxDamage, a.cooldown));
+            }
+        } else if (mod instanceof CapacityEffectMod) {
+            CapacityEffectMod cem = (CapacityEffectMod) mod;
+            lines.add("Modificateur de capacité — Effet :");
+            if (cem.effectOverride != null) {
+                lines.add(String.format("%s (%s) Dgt %.0f",
+                    cem.effectOverride.name, cem.effectOverride.type, cem.effectOverride.baseDamage));
+            }
+            if (cem.extraModifier != null) {
+                lines.add(String.format("+ %s x%.1f", cem.extraModifier.type.name(), cem.extraModifier.intensity));
+            }
+        }
+
+        Map<StatType, Float> bonuses = mod.getStatBonuses();
+        for (StatType t : StatType.values()) {
+            Float v = bonuses.get(t);
+            if (v != null && v != 0f) {
+                lines.add(String.format("+%.1f %s", v, statLabel(t)));
             }
         }
 

@@ -32,6 +32,7 @@ import adfinir.game.save.SaveManager;
 import adfinir.game.ui.MiniMap;
 import adfinir.game.ui.InventoryOverlay;
 import adfinir.game.ui.LootBarOverlay;
+import adfinir.game.ui.SocketInteractionState;
 import adfinir.game.ui.StatsOverlay;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
@@ -76,6 +77,7 @@ public class GameScreen implements Screen {
     private StatsOverlay statsOverlay;
     private InventoryOverlay inventoryOverlay;
     private LootBarOverlay lootBarOverlay;
+    private SocketInteractionState socketInteraction;
     private MiniMap      miniMap;
     private OrthographicCamera uiCamera;
     private int screenW, screenH;
@@ -217,6 +219,7 @@ public class GameScreen implements Screen {
             statsOverlay = new StatsOverlay();
             inventoryOverlay = new InventoryOverlay();
             lootBarOverlay = new LootBarOverlay();
+            socketInteraction = new SocketInteractionState();
             miniMap      = new MiniMap();
             uiCamera     = new OrthographicCamera();
         } else {
@@ -355,6 +358,10 @@ public class GameScreen implements Screen {
     @Override
     public void render(float delta) {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            if (inventoryOverlay.isHoldingMod()) {
+                inventoryOverlay.cancelHeld();
+                return;
+            }
             SaveManager.save(currentLevel, dungeonMap, playerTransform, playerStats,
                 player.getComponent(InventoryComponent.class));
             game.setScreen(new MainMenuScreen(game));
@@ -381,8 +388,15 @@ public class GameScreen implements Screen {
         lootBarOverlay.update(player.getComponent(LootBarComponent.class),
             player.getComponent(InventoryComponent.class),
             player.getComponent(CombatComponent.class),
-            playerStats);
+            playerStats,
+            socketInteraction);
         lootBarOverlay.handleInput();
+
+        inventoryOverlay.update(player.getComponent(InventoryComponent.class),
+            player.getComponent(LootBarComponent.class),
+            playerStats.stats,
+            socketInteraction);
+        inventoryOverlay.handleInput();
 
         engine.getSystem(StatsSystem.class).update(delta);
         engine.getSystem(CombatSystem.class).update(delta);
@@ -393,13 +407,13 @@ public class GameScreen implements Screen {
         engine.getSystem(LootPickupSystem.class).update(delta);
         engine.getSystem(DeathSystem.class).update(delta);
 
-            // Détecte une perte de PV pour déclencher un flash d'impact à l'écran
-            if (previousHp < 0f) {
-                previousHp = playerStats.currentHp;
-            } else if (playerStats.currentHp < previousHp - 0.01f) {
-                damageFlashAlpha = 0.5f;
-            }
+        // Détecte une perte de PV pour déclencher un flash d'impact à l'écran
+        if (previousHp < 0f) {
             previousHp = playerStats.currentHp;
+        } else if (playerStats.currentHp < previousHp - 0.01f) {
+            damageFlashAlpha = 0.5f;
+        }
+        previousHp = playerStats.currentHp;
 
         // Mort du joueur → écran de game over (permadeath : la sauvegarde est effacée)
         if (playerStats.isDead) {
@@ -447,7 +461,6 @@ public class GameScreen implements Screen {
         engine.getSystem(RenderSystem.class).update(delta);
         shapeRenderer.end();
 
-        inventoryOverlay.update(player.getComponent(InventoryComponent.class));
         inventoryOverlay.draw();
 
         lootBarOverlay.draw();
