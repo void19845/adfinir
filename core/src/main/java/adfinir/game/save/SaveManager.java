@@ -2,6 +2,7 @@ package adfinir.game.save;
 
 import adfinir.game.dungeon.DungeonMap;
 import adfinir.game.ecs.components.InventoryComponent;
+import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
 import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.inventory.Armor;
@@ -10,6 +11,7 @@ import adfinir.game.inventory.Artifact;
 import adfinir.game.inventory.Capacity;
 import adfinir.game.inventory.CapacityEffect;
 import adfinir.game.inventory.CapacityModifier;
+import adfinir.game.inventory.Item;
 import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.inventory.ItemModifier;
 import adfinir.game.inventory.Rarity;
@@ -38,9 +40,10 @@ public class SaveManager {
         if (f.exists()) f.delete();
     }
 
-    /** Sauvegarde l'étage courant (layout inclus), la position, les PV/Stamina et l'équipement. */
+    /** Sauvegarde l'étage courant (layout inclus), la position, les PV/Stamina, l'équipement et la loot bar. */
     public static void save(int currentLevel, DungeonMap dungeonMap, TransformComponent transform,
-                            PlayerStatsComponent playerStats, InventoryComponent inventory) {
+                            PlayerStatsComponent playerStats, InventoryComponent inventory,
+                            LootBarComponent lootBar) {
         SaveData data = new SaveData();
         data.currentLevel   = currentLevel;
         data.currentHp      = playerStats.currentHp;
@@ -58,6 +61,10 @@ public class SaveManager {
         data.armor    = toSave(inventory.armor);
         data.capacity = toSave(inventory.capacity);
         data.artifact = toSave(inventory.artifact);
+
+        for (Item item : lootBar.slots) {
+            data.lootBar.add(toItemSlotSave(item));
+        }
 
         Json json = new Json();
         json.setOutputType(JsonWriter.OutputType.json);
@@ -96,6 +103,17 @@ public class SaveManager {
         inv.equipCapacity(fromSave(data.capacity));
         inv.equipArtifact(fromSave(data.artifact));
         return inv;
+    }
+
+    /** Reconstruit la loot bar (8 slots) à partir des données sauvegardées. */
+    public static LootBarComponent toLootBar(SaveData data) {
+        LootBarComponent bar = new LootBarComponent();
+        if (data.lootBar != null) {
+            for (int i = 0; i < data.lootBar.size() && i < LootBarComponent.CAPACITY; i++) {
+                bar.slots[i] = fromItemSlotSave(data.lootBar.get(i));
+            }
+        }
+        return bar;
     }
 
     // ------------------------------------------------------------------
@@ -240,5 +258,44 @@ public class SaveManager {
         // reconstruit via l'ID, ItemGenerator restant la seule source de vérité
         // pour l'association passiveEffectId -> comportement.
         return ItemGenerator.createArtifactById(s.passiveEffectId, s.name, Rarity.valueOf(s.rarity));
+    }
+
+    // ------------------------------------------------------------------
+    // Loot bar — wrapper générique (un slot peut contenir n'importe lequel
+    // des 5 types d'Item, contrairement aux 4 slots d'équipement typés)
+    // ------------------------------------------------------------------
+
+    private static SaveData.ItemSlotSave toItemSlotSave(Item item) {
+        SaveData.ItemSlotSave s = new SaveData.ItemSlotSave();
+        if (item instanceof Weapon) {
+            s.kind = "WEAPON";
+            s.weapon = toSave((Weapon) item);
+        } else if (item instanceof Armor) {
+            s.kind = "ARMOR";
+            s.armor = toSave((Armor) item);
+        } else if (item instanceof Capacity) {
+            s.kind = "CAPACITY";
+            s.capacity = toSave((Capacity) item);
+        } else if (item instanceof Artifact) {
+            s.kind = "ARTIFACT";
+            s.artifact = toSave((Artifact) item);
+        } else if (item instanceof ItemModifier) {
+            s.kind = "MODIFIER";
+            s.modifier = toSocketSave((ItemModifier) item);
+        }
+        // item == null => s.kind reste null (slot vide)
+        return s;
+    }
+
+    private static Item fromItemSlotSave(SaveData.ItemSlotSave s) {
+        if (s == null || s.kind == null) return null;
+        switch (s.kind) {
+            case "WEAPON":   return fromSave(s.weapon);
+            case "ARMOR":    return fromSave(s.armor);
+            case "CAPACITY": return fromSave(s.capacity);
+            case "ARTIFACT": return fromSave(s.artifact);
+            case "MODIFIER": return fromSocketSave(s.modifier);
+            default:         return null;
+        }
     }
 }

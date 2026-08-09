@@ -47,6 +47,25 @@ public class SaveData {
     public CapacitySave capacity;
     public ArtifactSave artifact;
 
+    /** Barre de loot (8 slots), un ItemSlotSave par slot dans l'ordre ; kind==null = slot vide. */
+    public List<ItemSlotSave> lootBar = new ArrayList<>();
+
+    /**
+     * Wrapper générique pour un slot de la loot bar : celle-ci peut contenir
+     * n'importe lequel des 5 types d'Item (Weapon/Armor/Capacity/Artifact/
+     * ItemModifier), contrairement aux 4 slots d'équipement typés. `kind`
+     * indique lequel des champs ci-dessous est renseigné (un seul, les autres
+     * restent null) ; null = slot vide.
+     */
+    public static class ItemSlotSave {
+        public String kind; // "WEAPON" / "ARMOR" / "CAPACITY" / "ARTIFACT" / "MODIFIER", null si vide
+        public WeaponSave weapon;
+        public ArmorSave armor;
+        public CapacitySave capacity;
+        public ArtifactSave artifact;
+        public SocketSave modifier; // réutilise SocketSave (modifierId + rarity) pour un ItemModifier autonome
+    }
+
     public static class WeaponSave {
         public String name;
         public String rarity;   // Rarity.name()

@@ -194,17 +194,19 @@ public class GameScreen implements Screen {
             // Synchronise les stats avec l'équipement (généré ou restauré)
             inventory.updateStats(playerStats.stats);
 
+            LootBarComponent lootBar;
             if (pendingLoad != null) {
                 // Restaure les PV/Stamina sauvegardés, bornés au maximum actuel
                 // (au cas où l'équipement rechargé donnerait un max différent).
                 playerStats.currentHp      = Math.min(pendingLoad.currentHp, playerStats.stats.maxHp());
                 playerStats.currentStamina = Math.min(pendingLoad.currentStamina, playerStats.stats.maxStamina());
+                lootBar = SaveManager.toLootBar(pendingLoad);
                 pendingLoad = null; // sauvegarde consommée
+            } else {
+                lootBar = new LootBarComponent();
             }
 
             playerCombat.weapon = inventory.weapon;
-
-            LootBarComponent lootBar = new LootBarComponent();
 
             player.add(playerTransform);
             player.add(playerVel);
@@ -352,7 +354,8 @@ public class GameScreen implements Screen {
         camera.update();
         // Checkpoint : sauvegarde automatique à chaque nouvel étage
         SaveManager.save(currentLevel, dungeonMap, playerTransform, playerStats,
-            player.getComponent(InventoryComponent.class));
+            player.getComponent(InventoryComponent.class),
+            player.getComponent(LootBarComponent.class));
     }
 
     @Override
@@ -363,7 +366,8 @@ public class GameScreen implements Screen {
                 return;
             }
             SaveManager.save(currentLevel, dungeonMap, playerTransform, playerStats,
-                player.getComponent(InventoryComponent.class));
+                player.getComponent(InventoryComponent.class),
+                player.getComponent(LootBarComponent.class));
             game.setScreen(new MainMenuScreen(game));
             dispose();
             return;
