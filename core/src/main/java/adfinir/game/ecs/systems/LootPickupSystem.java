@@ -10,12 +10,12 @@ import adfinir.game.inventory.Item;
 import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.inventory.ItemModifier;
 import adfinir.game.inventory.Weapon;
+import adfinir.game.input.GameAction;
+import adfinir.game.input.KeyBindings;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 
 /**
@@ -67,7 +67,7 @@ public class LootPickupSystem extends IteratingSystem {
         }
 
         // Barre pleine : échange manuel avec le slot en surbrillance via [F]
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+        if (KeyBindings.isJustPressed(GameAction.PICKUP)) {
             Item incoming = resolveItem(loot);
             int idx = lootBar.selectedIndex;
             Item outgoing = lootBar.slots[idx];

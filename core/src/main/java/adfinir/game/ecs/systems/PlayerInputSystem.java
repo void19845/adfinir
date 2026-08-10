@@ -8,6 +8,8 @@ import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
 import adfinir.game.ecs.components.VelocityComponent;
+import adfinir.game.input.GameAction;
+import adfinir.game.input.KeyBindings;
 import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.inventory.Weapon;
 import adfinir.game.inventory.WeaponType;
@@ -46,10 +48,10 @@ public class PlayerInputSystem extends IteratingSystem {
 
         float dx = 0f, dy = 0f;
 
-        if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP))    dy += 1f;
-        if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN))  dy -= 1f;
-        if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT))  dx -= 1f;
-        if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) dx += 1f;
+        if (KeyBindings.isPressed(GameAction.MOVE_UP))    dy += 1f;
+        if (KeyBindings.isPressed(GameAction.MOVE_DOWN))  dy -= 1f;
+        if (KeyBindings.isPressed(GameAction.MOVE_LEFT))  dx -= 1f;
+        if (KeyBindings.isPressed(GameAction.MOVE_RIGHT)) dx += 1f;
 
         // Normaliser le vecteur diagonal pour éviter un mouvement plus rapide en diagonale
         float len = (float) Math.sqrt(dx * dx + dy * dy);
@@ -64,8 +66,8 @@ public class PlayerInputSystem extends IteratingSystem {
         vel.vx = dx * input.speed;
         vel.vy = dy * input.speed;
 
-        // Attaque : Clic gauche (JustPressed) ou Touche Espace
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+        // Attaque : Clic gauche (JustPressed) ou touche configurée (défaut Espace)
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) || KeyBindings.isJustPressed(GameAction.ATTACK)) {
             CombatComponent combat = cm.get(entity);
             if (combat != null && combat.canAttack()) {
                 // Utiliser la dernière direction enregistrée
@@ -73,18 +75,18 @@ public class PlayerInputSystem extends IteratingSystem {
             }
         }
 
-        // Sort (Capacity équipée) : Touche Q — chaque compétence a sa touche dédiée
-        if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
+        // Sort (Capacity équipée) : chaque compétence a sa touche dédiée (défaut Q)
+        if (KeyBindings.isJustPressed(GameAction.CAPACITY)) {
             tryCastCapacity(entity, input);
         }
 
-        // Dash : Touche Tab
-        if (Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
+        // Dash (défaut Tab)
+        if (KeyBindings.isJustPressed(GameAction.DASH)) {
             tryDash(entity, input);
         }
 
-        // Switch arme : Touche X
-        if (Gdx.input.isKeyJustPressed(Input.Keys.X)) {
+        // Switch arme (défaut X)
+        if (KeyBindings.isJustPressed(GameAction.SWITCH_WEAPON)) {
             InventoryComponent inv = im.get(entity);
             if (inv != null) {
                 // Cycle : SWORD -> SPEAR -> CLAYMORE -> SWORD

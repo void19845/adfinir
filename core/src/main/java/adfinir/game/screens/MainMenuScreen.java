@@ -3,6 +3,7 @@ package adfinir.game.screens;
 import adfinir.game.Main;
 import adfinir.game.save.SaveData;
 import adfinir.game.save.SaveManager;
+import adfinir.game.ui.SettingsOverlay;
 import adfinir.game.ui.UiFx;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
@@ -40,6 +41,8 @@ public class MainMenuScreen implements Screen {
     private Stage stage;
     private Skin skin;
     private UiFx uiFx;
+    private SettingsOverlay settingsOverlay;
+    private boolean settingsWasVisible = false;
 
     private ShapeRenderer shapeRenderer;
     private Mote[] motes;
@@ -55,6 +58,8 @@ public class MainMenuScreen implements Screen {
         skin  = new Skin(Gdx.files.internal("ui/uiskin.json"));
         uiFx  = new UiFx();
         shapeRenderer = new ShapeRenderer();
+        settingsOverlay = new SettingsOverlay();
+        settingsOverlay.configure(false, null); // pas de ligne "Quitter" depuis le menu principal
         Gdx.input.setInputProcessor(stage);
 
         motes = new Mote[36];
@@ -124,6 +129,17 @@ public class MainMenuScreen implements Screen {
         panel.add(btnPlay).width(220).height(56).padBottom(14).row();
         fadeInStaggered(btnPlay, slot++);
 
+        TextButton btnSettings = new TextButton("Paramètres", btnStyle);
+        btnSettings.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                Gdx.input.setInputProcessor(null); // évite les clics à travers vers les boutons du Stage
+                settingsOverlay.open();
+            }
+        });
+        panel.add(btnSettings).width(220).height(56).padBottom(14).row();
+        fadeInStaggered(btnSettings, slot++);
+
         TextButton btnQuit = new TextButton("Quitter", btnStyle);
         btnQuit.addListener(new ChangeListener() {
             @Override
@@ -154,6 +170,19 @@ public class MainMenuScreen implements Screen {
 
         stage.act(delta);
         stage.draw();
+
+        if (settingsOverlay.isVisible()) {
+            if (Gdx.input.isKeyJustPressed(com.badlogic.gdx.Input.Keys.ESCAPE)) {
+                settingsOverlay.close();
+            } else {
+                settingsOverlay.handleInput();
+            }
+            settingsOverlay.draw();
+        }
+        if (settingsWasVisible && !settingsOverlay.isVisible()) {
+            Gdx.input.setInputProcessor(stage); // rend la main aux boutons du Stage à la fermeture
+        }
+        settingsWasVisible = settingsOverlay.isVisible();
     }
 
     /** Dégradé nocturne + poussière ambiante flottante, calé sur la caméra du Stage. */
@@ -180,6 +209,7 @@ public class MainMenuScreen implements Screen {
     @Override
     public void resize(int w, int h) {
         stage.getViewport().update(w, h, true);
+        settingsOverlay.resize(w, h);
     }
 
     @Override public void pause() {}
@@ -192,6 +222,7 @@ public class MainMenuScreen implements Screen {
         skin.dispose();
         shapeRenderer.dispose();
         uiFx.dispose();
+        settingsOverlay.dispose();
     }
 
     /** Petite particule de poussière ambiante qui monte lentement à l'écran. */

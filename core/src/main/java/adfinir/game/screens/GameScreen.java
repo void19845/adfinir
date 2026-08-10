@@ -35,9 +35,12 @@ import adfinir.game.inventory.Weapon;
 
 import adfinir.game.save.SaveData;
 import adfinir.game.save.SaveManager;
+import adfinir.game.input.GameAction;
+import adfinir.game.input.KeyBindings;
 import adfinir.game.ui.MiniMap;
 import adfinir.game.ui.InventoryOverlay;
 import adfinir.game.ui.LootBarOverlay;
+import adfinir.game.ui.SettingsOverlay;
 import adfinir.game.ui.ShopOverlay;
 import adfinir.game.ui.SocketInteractionState;
 import adfinir.game.ui.StatsOverlay;
@@ -85,6 +88,7 @@ public class GameScreen implements Screen {
     private InventoryOverlay inventoryOverlay;
     private LootBarOverlay lootBarOverlay;
     private ShopOverlay shopOverlay;
+    private SettingsOverlay settingsOverlay;
     private SocketInteractionState socketInteraction;
     private MiniMap      miniMap;
     private OrthographicCamera uiCamera;
@@ -243,6 +247,8 @@ public class GameScreen implements Screen {
             inventoryOverlay = new InventoryOverlay();
             lootBarOverlay = new LootBarOverlay();
             shopOverlay = new ShopOverlay();
+            settingsOverlay = new SettingsOverlay();
+            settingsOverlay.configure(true, this::quitToMainMenu);
             socketInteraction = new SocketInteractionState();
             miniMap      = new MiniMap();
             uiCamera     = new OrthographicCamera();
@@ -381,6 +387,15 @@ public class GameScreen implements Screen {
             player.getComponent(LootBarComponent.class));
     }
 
+    /** Sauvegarde et retourne au menu principal — appelé depuis le menu paramètres (ligne "Quitter"). */
+    private void quitToMainMenu() {
+        SaveManager.save(currentLevel, dungeonMap, playerTransform, playerStats,
+            player.getComponent(InventoryComponent.class),
+            player.getComponent(LootBarComponent.class));
+        game.setScreen(new MainMenuScreen(game));
+        dispose();
+    }
+
     @Override
     public void render(float delta) {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
@@ -388,20 +403,24 @@ public class GameScreen implements Screen {
                 inventoryOverlay.cancelHeld();
                 return;
             }
-            SaveManager.save(currentLevel, dungeonMap, playerTransform, playerStats,
-                player.getComponent(InventoryComponent.class),
-                player.getComponent(LootBarComponent.class));
-            game.setScreen(new MainMenuScreen(game));
-            dispose();
+            // Échap ouvre/ferme le menu paramètres (qui contient aussi le bouton de sortie) au lieu
+            // de quitter instantanément — évite les sorties accidentelles.
+            if (settingsOverlay.isVisible()) {
+                settingsOverlay.close();
+            } else {
+                settingsOverlay.open();
+            }
             return;
         }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.K)) {
+        settingsOverlay.handleInput();
+
+        if (KeyBindings.isJustPressed(GameAction.STATS)) {
             statsOverlay.toggle();
         }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+        if (KeyBindings.isJustPressed(GameAction.INVENTORY)) {
             inventoryOverlay.toggle();
         }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+        if (KeyBindings.isJustPressed(GameAction.SHOP)) {
             shopOverlay.toggle();
         }
         if (shopOverlay.isVisible()) {
@@ -434,7 +453,7 @@ public class GameScreen implements Screen {
 
         // Menu ouvert (inventaire/boutique) : on coupe l'input joueur (déplacement, attaque,
         // capacité) pour qu'un clic dans le menu ne déclenche pas aussi une action en jeu.
-        boolean menuOpen = inventoryOverlay.isVisible() || shopOverlay.isVisible();
+        boolean menuOpen = inventoryOverlay.isVisible() || shopOverlay.isVisible() || settingsOverlay.isVisible();
 
         engine.getSystem(StatsSystem.class).update(delta);
         engine.getSystem(CombatSystem.class).update(delta);
@@ -519,6 +538,8 @@ public class GameScreen implements Screen {
 
         shopOverlay.draw(screenW, screenH, player.getComponent(LootBarComponent.class), playerStats);
 
+        settingsOverlay.draw();
+
         shapeRenderer.setProjectionMatrix(uiCamera.combined);
         miniMap.draw(shapeRenderer, dungeonMap, playerTransform, screenW, screenH);
 
@@ -561,6 +582,7 @@ public class GameScreen implements Screen {
         inventoryOverlay.resize(w, h);
         lootBarOverlay.resize(w, h);
         shopOverlay.resize(w, h);
+        settingsOverlay.resize(w, h);
         uiCamera.viewportWidth = w;
         uiCamera.viewportHeight = h;
         uiCamera.position.set(w / 2f, h / 2f, 0);
@@ -578,5 +600,6 @@ public class GameScreen implements Screen {
         inventoryOverlay.dispose();
         lootBarOverlay.dispose();
         shopOverlay.dispose();
+        settingsOverlay.dispose();
     }
 }

@@ -4,6 +4,8 @@ import adfinir.game.inventory.*;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.InventoryComponent;
 import adfinir.game.ecs.components.LootBarComponent;
+import adfinir.game.input.GameAction;
+import adfinir.game.input.KeyBindings;
 import adfinir.game.player.StatSheet;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -164,7 +166,7 @@ public class InventoryOverlay implements Disposable {
 
         boolean leftClick  = Gdx.input.isButtonJustPressed(Input.Buttons.LEFT);
         boolean rightClick = Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT);
-        boolean rKey       = Gdx.input.isKeyJustPressed(Input.Keys.R);
+        boolean rKey       = KeyBindings.isJustPressed(GameAction.EXTRACT_SOCKET);
         if (!leftClick && !rightClick && !rKey) return;
 
         float mx = Gdx.input.getX();
