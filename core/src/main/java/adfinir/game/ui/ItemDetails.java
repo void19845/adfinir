@@ -32,15 +32,16 @@ public final class ItemDetails {
 
         if (item instanceof Weapon) {
             Weapon w = (Weapon) item;
+            List<WeaponAttack> combo = w.getActiveCombo();
             lines.add("Combos :");
-            int shown = Math.min(w.comboSlots.size(), 3);
+            int shown = Math.min(combo.size(), 3);
             for (int i = 0; i < shown; i++) {
-                WeaponAttack a = w.comboSlots.get(i);
+                WeaponAttack a = combo.get(i);
                 lines.add(String.format("%d. %s  %.0f-%.0f dgt (cd %.2fs)",
                     i + 1, a.name, a.minDamage, a.maxDamage, a.cooldown));
             }
-            if (w.comboSlots.size() > shown) {
-                lines.add("... +" + (w.comboSlots.size() - shown) + " autre(s)");
+            if (combo.size() > shown) {
+                lines.add("... +" + (combo.size() - shown) + " autre(s)");
             }
             appendSocketLines(lines, w.getSocketCount(), w::getSocket);
 

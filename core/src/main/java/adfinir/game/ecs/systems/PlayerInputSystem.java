@@ -1,5 +1,6 @@
 package adfinir.game.ecs.systems;
 
+import adfinir.game.ecs.components.CapacityComponent;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.InventoryComponent;
 import adfinir.game.ecs.components.LootBarComponent;
@@ -27,6 +28,7 @@ public class PlayerInputSystem extends IteratingSystem {
     private final ComponentMapper<VelocityComponent>    vm = ComponentMapper.getFor(VelocityComponent.class);
     private final ComponentMapper<PlayerInputComponent> pm = ComponentMapper.getFor(PlayerInputComponent.class);
     private final ComponentMapper<CombatComponent>      cm = ComponentMapper.getFor(CombatComponent.class);
+    private final ComponentMapper<CapacityComponent>    capm = ComponentMapper.getFor(CapacityComponent.class);
     private final ComponentMapper<InventoryComponent>   im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<LootBarComponent>     lbm = ComponentMapper.getFor(LootBarComponent.class);
     private final ComponentMapper<PlayerStatsComponent> sm = ComponentMapper.getFor(PlayerStatsComponent.class);
@@ -66,6 +68,15 @@ public class PlayerInputSystem extends IteratingSystem {
             if (combat != null && combat.canAttack()) {
                 // Utiliser la dernière direction enregistrée
                 combat.triggerAttack(input.lastDirX, input.lastDirY);
+            }
+        }
+
+        // Capacité : Clic droit (JustPressed)
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+            CapacityComponent capacityComp = capm.get(entity);
+            InventoryComponent inv = im.get(entity);
+            if (capacityComp != null && inv != null && inv.capacity != null && capacityComp.canCast()) {
+                capacityComp.trigger(input.lastDirX, input.lastDirY, inv.capacity.getActiveEffect().cooldown);
             }
         }
 

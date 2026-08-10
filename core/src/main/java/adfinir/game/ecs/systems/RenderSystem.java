@@ -58,11 +58,12 @@ public class RenderSystem extends IteratingSystem {
             float dx = combat.attackDirX;
             float dy = combat.attackDirY;
 
-            // On utilise le type d'arme pour la forme et l'attaque actuelle pour la taille
-            adfinir.game.player.AttackShape shape = weapon.type.shape;
-            float range = (combat.comboIndex < weapon.comboSlots.size())
-                ? weapon.comboSlots.get(combat.comboIndex).areaOfEffect * weapon.type.rangeMod
-                : 30f;
+            // La forme est portée par l'attaque active du combo (socketée), plus par le type d'arme
+            java.util.List<adfinir.game.inventory.WeaponAttack> activeCombo = weapon.getActiveCombo();
+            if (combat.comboIndex >= activeCombo.size()) return; // combo raccourci en cours de swing
+            adfinir.game.inventory.WeaponAttack currentAttack = activeCombo.get(combat.comboIndex);
+            AttackShape shape = currentAttack.shape;
+            float range = currentAttack.areaOfEffect * weapon.type.rangeMod;
 
             switch (shape) {
                 case CONE:
@@ -119,6 +120,18 @@ public class RenderSystem extends IteratingSystem {
                             arcDepth
                         );
                     }
+                    break;
+                case CIRCLE:
+                    // Disque plein centré sur le joueur
+                    shapeRenderer.circle(pos.x, pos.y, range, 24);
+                    break;
+                case FIXED_DISTANCE:
+                    // Hitbox statique à distance fixe devant le joueur (areaOfEffect = distance)
+                    shapeRenderer.circle(pos.x + dx * range, pos.y + dy * range,
+                        MeleeHitSystem.FIXED_DISTANCE_HIT_RADIUS, 16);
+                    break;
+                case PROJECTILE:
+                    // Rien à dessiner ici : l'entité projectile se rend elle-même (RenderComponent)
                     break;
             }
         }

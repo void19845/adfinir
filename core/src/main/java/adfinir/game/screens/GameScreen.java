@@ -4,6 +4,7 @@ import adfinir.game.Main;
 import adfinir.game.dungeon.DungeonGenerator;
 import adfinir.game.dungeon.DungeonMap;
 import adfinir.game.dungeon.DungeonRenderer;
+import adfinir.game.ecs.components.CapacityComponent;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.EnemyAIComponent;
 import adfinir.game.ecs.components.EnemyStatsComponent;
@@ -11,16 +12,20 @@ import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.LootComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
+import adfinir.game.ecs.components.ProjectileComponent;
 import adfinir.game.ecs.components.RenderComponent;
 import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
+import adfinir.game.ecs.systems.CapacitySystem;
 import adfinir.game.ecs.systems.CombatSystem;
 import adfinir.game.ecs.systems.DeathSystem;
 import adfinir.game.ecs.systems.EnemyAttackSystem;
 import adfinir.game.ecs.systems.EnemyMovementSystem;
 import adfinir.game.ecs.systems.LootPickupSystem;
+import adfinir.game.ecs.systems.MeleeHitSystem;
 import adfinir.game.ecs.systems.MovementSystem;
 import adfinir.game.ecs.systems.PlayerInputSystem;
+import adfinir.game.ecs.systems.ProjectileSystem;
 import adfinir.game.ecs.systems.RenderSystem;
 import adfinir.game.ecs.systems.StatsSystem;
 import adfinir.game.inventory.ItemGenerator;
@@ -154,7 +159,10 @@ public class GameScreen implements Screen {
             engine.addSystem(new StatsSystem());
             engine.addSystem(new CombatSystem());
             engine.addSystem(new PlayerInputSystem());
+            engine.addSystem(new MeleeHitSystem());
+            engine.addSystem(new CapacitySystem());
             engine.addSystem(new MovementSystem(dungeonMap));
+            engine.addSystem(new ProjectileSystem(dungeonMap));
             engine.addSystem(new RenderSystem(shapeRenderer));
 
             player          = new Entity();
@@ -179,6 +187,7 @@ public class GameScreen implements Screen {
 
             playerStats = new PlayerStatsComponent();
             CombatComponent playerCombat = new CombatComponent();
+            CapacityComponent playerCapacity = new CapacityComponent();
 
             InventoryComponent inventory;
             if (pendingLoad != null) {
@@ -214,6 +223,7 @@ public class GameScreen implements Screen {
             player.add(playerInput);
             player.add(playerStats);
             player.add(playerCombat);
+            player.add(playerCapacity);
             player.add(inventory);
             player.add(lootBar);
             engine.addEntity(player);
@@ -232,6 +242,7 @@ public class GameScreen implements Screen {
 
             clearFloorEntities();
             replaceSystem(MovementSystem.class, new MovementSystem(dungeonMap));
+            replaceSystem(ProjectileSystem.class, new ProjectileSystem(dungeonMap));
         }
 
         // Systèmes dépendants de la carte / des entités de l'étage : toujours reconstruits
@@ -256,7 +267,7 @@ public class GameScreen implements Screen {
     /** Retire les ennemis et objets de loot restants de l'étage précédent. */
     private void clearFloorEntities() {
         Array<Entity> toRemove = new Array<>();
-        for (Entity e : engine.getEntitiesFor(Family.one(EnemyStatsComponent.class, LootComponent.class).get())) {
+        for (Entity e : engine.getEntitiesFor(Family.one(EnemyStatsComponent.class, LootComponent.class, ProjectileComponent.class).get())) {
             toRemove.add(e);
         }
         for (Entity e : toRemove) {
@@ -405,9 +416,12 @@ public class GameScreen implements Screen {
         engine.getSystem(StatsSystem.class).update(delta);
         engine.getSystem(CombatSystem.class).update(delta);
         engine.getSystem(PlayerInputSystem.class).update(delta);
+        engine.getSystem(MeleeHitSystem.class).update(delta);
+        engine.getSystem(CapacitySystem.class).update(delta);
         engine.getSystem(EnemyMovementSystem.class).update(delta);
         engine.getSystem(EnemyAttackSystem.class).update(delta);
         engine.getSystem(MovementSystem.class).update(delta);
+        engine.getSystem(ProjectileSystem.class).update(delta);
         engine.getSystem(LootPickupSystem.class).update(delta);
         engine.getSystem(DeathSystem.class).update(delta);
 

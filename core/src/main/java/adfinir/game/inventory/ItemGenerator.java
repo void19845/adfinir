@@ -1,5 +1,6 @@
 package adfinir.game.inventory;
 
+import adfinir.game.player.AttackShape;
 import java.util.Random;
 
 /**
@@ -8,7 +9,7 @@ import java.util.Random;
 public class ItemGenerator {
     private static final Random rand = new Random();
 
-    /** Chance qu'un socket vide généré procéduralement soit pré-équipé d'un mod. */
+    /** Chance qu'un socket vide (au-delà du socket garanti) soit pré-équipé d'un mod. */
     private static final float SOCKET_PREFILL_CHANCE = 0.2f;
 
     private static final String[] WEAPON_MOD_IDS = { "COMBO_BRUTAL", "COMBO_RAFALE" };
@@ -28,23 +29,13 @@ public class ItemGenerator {
         String name = type.name() + " de " + rarity.name().toLowerCase();
         Weapon weapon = new Weapon(name, rarity, type);
 
-        // Générer un nombre de combos basé sur la rareté
-        int combos = 1 + rand.nextInt(3);
-        for (int i = 0; i < combos; i++) {
-            weapon.addAttack(new WeaponAttack(
-                "Attaque " + (i + 1),
-                10f * rarity.statMultiplier,
-                20f * rarity.statMultiplier,
-                0.5f + (rand.nextFloat() * 0.5f),
-                0.15f,
-                0.1f,
-                null,
-                30f
-            ));
-        }
-
+        // Le combo entier vient des sockets (WeaponComboMod) — plus d'attaque
+        // baked-in sur l'arme. Le socket 0 est garanti rempli pour qu'une
+        // arme ait toujours au moins une attaque (utile en particulier pour
+        // COMMON, qui n'a qu'un seul socket).
         for (int i = 0; i < weapon.getSocketCount(); i++) {
-            if (rand.nextFloat() < SOCKET_PREFILL_CHANCE) {
+            boolean mustFill = (i == 0);
+            if (mustFill || rand.nextFloat() < SOCKET_PREFILL_CHANCE) {
                 String id = WEAPON_MOD_IDS[rand.nextInt(WEAPON_MOD_IDS.length)];
                 weapon.setSocket(i, createModifierById(id, rarity));
             }
@@ -62,7 +53,7 @@ public class ItemGenerator {
 
     public static Capacity generateCapacity(float threatFactor) {
         Rarity rarity = getRandomRarity(threatFactor);
-        CapacityEffect base = new CapacityEffect("Boule de Feu", 15f, 300f, 50f, "FIRE");
+        CapacityEffect base = new CapacityEffect("Boule de Feu", 15f, 300f, 12f, "FIRE", 0.8f);
         Capacity cap = new Capacity("Sceptre Arcanique", rarity, base);
 
         // Ajouter des modificateurs selon la rareté
@@ -143,17 +134,17 @@ public class ItemGenerator {
                 return new WeaponComboMod(modifierId, "Combo Brutal", rarity, java.util.Arrays.asList(
                     new WeaponAttack("Coup Brutal",
                         15f * rarity.statMultiplier, 25f * rarity.statMultiplier,
-                        0.6f, 0.2f, 0.15f, null, 35f)
+                        0.6f, 0.2f, 0.15f, null, 35f, AttackShape.ARC)
                 ));
             case "COMBO_RAFALE":
                 return new WeaponComboMod(modifierId, "Combo Rafale", rarity, java.util.Arrays.asList(
                     new WeaponAttack("Frappe Rapide",
                         5f * rarity.statMultiplier, 10f * rarity.statMultiplier,
-                        0.25f, 0.1f, 0.05f, null, 20f)
+                        0.25f, 0.1f, 0.05f, null, 20f, AttackShape.CONE)
                 ));
             case "EFFECT_GLACE":
                 return new CapacityEffectMod(modifierId, "Éclat de Glace", rarity,
-                    new CapacityEffect("Éclat de Glace", 12f * rarity.statMultiplier, 250f, 40f, "ICE"),
+                    new CapacityEffect("Éclat de Glace", 12f * rarity.statMultiplier, 250f, 10f, "ICE", 0.6f),
                     null);
             case "EFFECT_FOUDRE":
                 return new CapacityEffectMod(modifierId, "Décharge", rarity,

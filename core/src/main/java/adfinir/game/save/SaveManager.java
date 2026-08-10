@@ -16,7 +16,6 @@ import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.inventory.ItemModifier;
 import adfinir.game.inventory.Rarity;
 import adfinir.game.inventory.Weapon;
-import adfinir.game.inventory.WeaponAttack;
 import adfinir.game.inventory.WeaponType;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
@@ -126,18 +125,6 @@ public class SaveManager {
         s.name   = w.name;
         s.rarity = w.rarity.name();
         s.type   = w.type.name();
-        for (WeaponAttack atk : w.comboSlots) {
-            SaveData.AttackSave as = new SaveData.AttackSave();
-            as.name         = atk.name;
-            as.minDamage    = atk.minDamage;
-            as.maxDamage    = atk.maxDamage;
-            as.cooldown     = atk.cooldown;
-            as.duration     = atk.duration;
-            as.knockback    = atk.knockback;
-            as.element      = atk.element;
-            as.areaOfEffect = atk.areaOfEffect;
-            s.combos.add(as);
-        }
         for (int i = 0; i < w.getSocketCount(); i++) {
             s.sockets.add(toSocketSave(w.getSocket(i)));
         }
@@ -147,10 +134,6 @@ public class SaveManager {
     private static Weapon fromSave(SaveData.WeaponSave s) {
         if (s == null) return null;
         Weapon w = new Weapon(s.name, Rarity.valueOf(s.rarity), WeaponType.valueOf(s.type));
-        for (SaveData.AttackSave as : s.combos) {
-            w.addAttack(new WeaponAttack(as.name, as.minDamage, as.maxDamage,
-                as.cooldown, as.duration, as.knockback, as.element, as.areaOfEffect));
-        }
         if (s.sockets != null) {
             for (int i = 0; i < s.sockets.size() && i < w.getSocketCount(); i++) {
                 w.setSocket(i, fromSocketSave(s.sockets.get(i)));
@@ -193,6 +176,7 @@ public class SaveManager {
         s.effectSpeed  = c.mainEffect.speed;
         s.effectRadius = c.mainEffect.radius;
         s.effectType   = c.mainEffect.type;
+        s.effectCooldown = c.mainEffect.cooldown;
         for (CapacityModifier m : c.modifiers) {
             SaveData.ModifierSave ms = new SaveData.ModifierSave();
             ms.type      = m.type.name();
@@ -208,7 +192,7 @@ public class SaveManager {
     private static Capacity fromSave(SaveData.CapacitySave s) {
         if (s == null) return null;
         CapacityEffect effect = new CapacityEffect(
-            s.effectName, s.effectDamage, s.effectSpeed, s.effectRadius, s.effectType);
+            s.effectName, s.effectDamage, s.effectSpeed, s.effectRadius, s.effectType, s.effectCooldown);
         Capacity c = new Capacity(s.name, Rarity.valueOf(s.rarity), effect);
         for (SaveData.ModifierSave ms : s.modifiers) {
             c.addModifier(new CapacityModifier(CapacityModifier.ModType.valueOf(ms.type), ms.intensity));
