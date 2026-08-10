@@ -74,6 +74,15 @@ public class InventoryOverlay implements Disposable {
     private static final float SOCKET_SIZE = 16f;
     private static final float SOCKET_GAP  = 4f;
 
+    // --- Palette (cohérente avec ShopOverlay) ---
+    private static final Color BG          = new Color(0.06f, 0.06f, 0.09f, 0.94f);
+    private static final Color BORDER      = new Color(0.35f, 0.75f, 0.85f, 0.9f);   // cyan doux
+    private static final Color ROW_BG      = new Color(0.14f, 0.14f, 0.19f, 1f);
+    private static final Color ROW_SELECTED= new Color(0.16f, 0.22f, 0.27f, 1f);
+    private static final Color ROW_HOVER   = new Color(0.20f, 0.19f, 0.26f, 1f);
+    private static final Color DETAIL_BG   = new Color(0.09f, 0.09f, 0.12f, 1f);
+    private static final Color RULE_COLOR  = new Color(0.35f, 0.75f, 0.85f, 0.5f);
+
     private static final float BOX_W =
         PADDING + SLOT_W + PADDING + DETAIL_W + PADDING;
 
@@ -224,25 +233,57 @@ public class InventoryOverlay implements Disposable {
         float slotX = boxX + PADDING;
         float detailX = slotX + SLOT_W + PADDING;
 
+        float mx = Gdx.input.getX();
+        float my = screenH - Gdx.input.getY();
+
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
         // Fond du panneau
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(0f, 0f, 0f, 0.85f);
+        shapes.setColor(BG);
+        shapes.rect(boxX, boxY, BOX_W, BOX_H);
+        shapes.end();
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(BORDER);
         shapes.rect(boxX, boxY, BOX_W, BOX_H);
         shapes.end();
 
         // Y du haut du premier slot (juste sous le titre)
         float firstSlotTop = boxY + BOX_H - PADDING - HEADER_H - PADDING;
+        float headerRuleY  = firstSlotTop + PADDING / 2f;
+        float footerRuleY  = boxY + PADDING + FOOTER_H + PADDING / 2f;
 
-        // Cadres des 4 slots (cyan pour le slot sélectionné)
-        shapes.begin(ShapeRenderer.ShapeType.Line);
+        // Fonds des slots (sélection / survol / normal) + panneau de détails
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (int i = 0; i < SLOT_COUNT; i++) {
             float slotY = firstSlotTop - i * (SLOT_H + SLOT_GAP) - SLOT_H;
-            shapes.setColor(i == selectedSlotIndex ? Color.CYAN : Color.GRAY);
+            boolean hovered = (i == 0 || i == 1) && mx >= slotX && mx <= slotX + SLOT_W
+                && my >= slotY && my <= slotY + SLOT_H;
+            shapes.setColor(i == selectedSlotIndex ? ROW_SELECTED : (hovered ? ROW_HOVER : ROW_BG));
             shapes.rect(slotX, slotY, SLOT_W, SLOT_H);
-            shapes.setColor(Color.GRAY);
+            shapes.setColor(DETAIL_BG);
+            shapes.rect(detailX, slotY, DETAIL_W, SLOT_H);
+        }
+        shapes.end();
+
+        // Séparateurs (titre / footer) + cadres des 4 slots (rareté, cyan si sélectionné)
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(RULE_COLOR);
+        shapes.line(slotX, headerRuleY, boxX + BOX_W - PADDING, headerRuleY);
+        shapes.line(slotX, footerRuleY, boxX + BOX_W - PADDING, footerRuleY);
+
+        Item[]   itemsForBorder  = {
+            currentInventory.weapon, currentInventory.capacity,
+            currentInventory.armor, currentInventory.artifact
+        };
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            float slotY = firstSlotTop - i * (SLOT_H + SLOT_GAP) - SLOT_H;
+            Item item = itemsForBorder[i];
+            shapes.setColor(i == selectedSlotIndex ? Color.CYAN
+                : (item != null ? ItemDetails.rarityColor(item.rarity) : Color.DARK_GRAY));
+            shapes.rect(slotX, slotY, SLOT_W, SLOT_H);
+            shapes.setColor(Color.DARK_GRAY);
             shapes.rect(detailX, slotY, DETAIL_W, SLOT_H);
         }
         shapes.end();
@@ -259,8 +300,10 @@ public class InventoryOverlay implements Disposable {
         batch.begin();
 
         // Titre : positionné au-dessus des slots, ne les chevauche plus
+        font.getData().setScale(1.15f);
         font.setColor(Color.YELLOW);
-        font.draw(batch, "--- INVENTAIRE ---", slotX, boxY + BOX_H - PADDING);
+        font.draw(batch, "INVENTAIRE", slotX, boxY + BOX_H - PADDING);
+        font.getData().setScale(1f);
 
         String[] labels = { "Arme", "Capacité", "Armure", "Artéfact" };
         Item[]   items  = {

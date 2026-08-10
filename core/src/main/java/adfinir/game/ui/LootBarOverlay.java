@@ -19,7 +19,7 @@ import com.badlogic.gdx.utils.Disposable;
 import java.util.List;
 
 /**
- * Barre d'objets ramassés (8 cercles) affichée en haut de l'écran.
+ * Barre d'objets ramassés (8 cercles) affichée en bas de l'écran.
  *
  * - Cercle en surbrillance (contour jaune) = sélection actuelle. Cible du swap
  *   au sol [F] (voir LootPickupSystem) et valeur par défaut = le premier cercle.
@@ -38,10 +38,10 @@ import java.util.List;
  */
 public class LootBarOverlay implements Disposable {
 
-    private static final int   CIRCLE_COUNT = LootBarComponent.CAPACITY; // 8
-    private static final float RADIUS       = 18f;
-    private static final float SPACING      = 46f;
-    private static final float TOP_MARGIN   = 30f;
+    private static final int   CIRCLE_COUNT   = LootBarComponent.CAPACITY; // 8
+    private static final float RADIUS         = 18f;
+    private static final float SPACING        = 46f;
+    private static final float BOTTOM_MARGIN  = 40f;
     private static final float DETAIL_SCALE    = 1.0f;
 
     private final SpriteBatch   batch;
@@ -114,7 +114,7 @@ public class LootBarOverlay implements Disposable {
     }
 
     private float circleY() {
-        return screenH - TOP_MARGIN;
+        return BOTTOM_MARGIN;
     }
 
     /** Index du cercle sous la souris, ou -1. Coordonnées écran → origine haut-gauche à convertir. */
@@ -187,12 +187,12 @@ public class LootBarOverlay implements Disposable {
 
         batch.begin();
 
-        // Numéro de raccourci (1-8) sous chaque cercle + symbole ◈ sur les mods
+        // Numéro de raccourci (1-8) au-dessus de chaque cercle + symbole ◈ sur les mods
         font.getData().setScale(DETAIL_SCALE);
         for (int i = 0; i < CIRCLE_COUNT; i++) {
             float cx = startX + i * SPACING;
             font.setColor(Color.WHITE);
-            font.draw(batch, String.valueOf(i + 1), cx - 4, cy - RADIUS - 4);
+            font.draw(batch, String.valueOf(i + 1), cx - 4, cy + RADIUS + 16f);
 
             if (bar.slots[i] instanceof ItemModifier) {
                 font.setColor(ItemDetails.MOD_BORDER_COLOR);
@@ -201,19 +201,24 @@ public class LootBarOverlay implements Disposable {
         }
 
         if (hovered >= 0 && bar.slots[hovered] != null) {
-            drawTooltip(startX + hovered * SPACING, cy - RADIUS - 10, bar.slots[hovered]);
+            // La barre est en bas de l'écran : l'infobulle s'ouvre vers le haut, ancrée par le bas.
+            drawTooltip(startX + hovered * SPACING, cy + RADIUS + 8f, bar.slots[hovered]);
         }
 
         batch.end();
     }
 
-    private void drawTooltip(float anchorX, float anchorY, Item item) {
-        font.setColor(Color.YELLOW);
-        font.draw(batch, item.name, anchorX - 80, anchorY, 160, Align.center, true);
-
+    /** bottomY = bas de l'infobulle (juste au-dessus du cercle) ; le bloc entier s'étend vers le haut. */
+    private void drawTooltip(float anchorX, float bottomY, Item item) {
         List<String> lines = ItemDetails.buildDetailLines(item);
+        float titleH = 14f;
+        float y = bottomY + titleH + lines.size() * 12f;
+
+        font.setColor(Color.YELLOW);
+        font.draw(batch, item.name, anchorX - 80, y, 160, Align.center, true);
+
         font.setColor(Color.LIGHT_GRAY);
-        float y = anchorY - 14f;
+        y -= titleH;
         for (String line : lines) {
             font.draw(batch, line, anchorX - 100, y, 200, Align.center, true);
             y -= 12f;

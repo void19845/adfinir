@@ -426,9 +426,21 @@ public class GameScreen implements Screen {
             socketInteraction);
         inventoryOverlay.handleInput();
 
+        // Menu ouvert (inventaire/boutique) : on coupe l'input joueur (déplacement, attaque,
+        // capacité) pour qu'un clic dans le menu ne déclenche pas aussi une action en jeu.
+        boolean menuOpen = inventoryOverlay.isVisible() || shopOverlay.isVisible();
+
         engine.getSystem(StatsSystem.class).update(delta);
         engine.getSystem(CombatSystem.class).update(delta);
-        engine.getSystem(PlayerInputSystem.class).update(delta);
+        if (menuOpen) {
+            VelocityComponent playerVelocity = player.getComponent(VelocityComponent.class);
+            if (playerVelocity != null) {
+                playerVelocity.vx = 0f;
+                playerVelocity.vy = 0f;
+            }
+        } else {
+            engine.getSystem(PlayerInputSystem.class).update(delta);
+        }
         engine.getSystem(CapacitySystem.class).update(delta);
         engine.getSystem(EnemyMovementSystem.class).update(delta);
         engine.getSystem(EnemyAttackSystem.class).update(delta);
