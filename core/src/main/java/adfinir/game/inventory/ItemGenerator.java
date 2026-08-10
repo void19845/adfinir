@@ -164,6 +164,11 @@ public class ItemGenerator {
         }
     }
 
+    /** Prix boutique d'un objet selon sa rareté. */
+    public static int priceFor(Rarity rarity) {
+        return Math.round(30 * rarity.statMultiplier);
+    }
+
     private static Rarity getRandomRarity() {
         return getRandomRarity(1f);
     }

@@ -31,6 +31,7 @@ public class SaveData {
 
     public float currentHp;
     public float currentStamina;
+    public int gold = 100;
 
     public float playerX;
     public float playerY;

@@ -48,6 +48,7 @@ public class SaveManager {
         data.currentLevel   = currentLevel;
         data.currentHp      = playerStats.currentHp;
         data.currentStamina = playerStats.currentStamina;
+        data.gold           = playerStats.gold;
         data.playerX = transform.x;
         data.playerY = transform.y;
 

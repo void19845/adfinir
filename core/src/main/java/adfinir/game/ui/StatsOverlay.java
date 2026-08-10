@@ -35,6 +35,7 @@ public class StatsOverlay implements Disposable {
     private String mag      = "—";
     private String def      = "—";
     private String spd      = "—";
+    private String gold     = "—";
 
     public StatsOverlay() {
         batch  = new SpriteBatch();
@@ -57,6 +58,7 @@ public class StatsOverlay implements Disposable {
         mag     = String.format("%.0f",        stats.mag());
         def     = String.format("%.0f",        stats.def());
         spd     = String.format("%.0f px/s",   stats.spd());
+        gold    = String.valueOf(stats.gold);
     }
 
     public void draw() {
@@ -64,8 +66,8 @@ public class StatsOverlay implements Disposable {
 
         int screenH = Gdx.graphics.getHeight();
 
-        // Lignes : titre + 6 stats + hint = 8 lignes
-        int lines   = 8;
+        // Lignes : titre + 7 stats + hint = 9 lignes
+        int lines   = 9;
         float boxW  = 200f;
         float boxH  = PAD * 2 + lines * LINE_H;
         float boxX  = MARGIN;
@@ -103,6 +105,7 @@ public class StatsOverlay implements Disposable {
         drawRow(batch, font, x, xVal, y, "MAG",     mag,     Color.CYAN);       y -= LINE_H;
         drawRow(batch, font, x, xVal, y, "DEF",     def,     Color.LIGHT_GRAY); y -= LINE_H;
         drawRow(batch, font, x, xVal, y, "SPD",     spd,     Color.WHITE);      y -= LINE_H;
+        drawRow(batch, font, x, xVal, y, "Or",      gold,    Color.GOLD);       y -= LINE_H;
 
         font.setColor(0.5f, 0.5f, 0.5f, 1f);
         font.draw(batch, "[K] fermer", x, y);

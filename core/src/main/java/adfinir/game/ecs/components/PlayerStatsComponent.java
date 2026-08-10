@@ -19,6 +19,7 @@ public class PlayerStatsComponent implements Component, Pool.Poolable {
     public float currentStamina;
 
     public boolean isDead = false;
+    public int gold = 100;
 
     public PlayerStatsComponent() {
         reset();
@@ -30,6 +31,18 @@ public class PlayerStatsComponent implements Component, Pool.Poolable {
         currentHp      = stats.maxHp();
         currentStamina = stats.maxStamina();
         isDead         = false;
+        gold           = 100;
+    }
+
+    public void addGold(int amount) {
+        gold += amount;
+    }
+
+    /** Dépense de l'or si suffisant. Retourne true si la dépense a pu être faite. */
+    public boolean spendGold(int amount) {
+        if (gold < amount) return false;
+        gold -= amount;
+        return true;
     }
 
     // ---------------------------------------------------------------

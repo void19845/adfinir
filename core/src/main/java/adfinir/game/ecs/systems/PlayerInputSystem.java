@@ -1,11 +1,14 @@
 package adfinir.game.ecs.systems;
 
+import adfinir.game.combat.CapacityBurst;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.InventoryComponent;
 import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
+import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
+import adfinir.game.inventory.Capacity;
 import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.inventory.Weapon;
 import adfinir.game.inventory.WeaponType;
@@ -30,9 +33,13 @@ public class PlayerInputSystem extends IteratingSystem {
     private final ComponentMapper<InventoryComponent>   im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<LootBarComponent>     lbm = ComponentMapper.getFor(LootBarComponent.class);
     private final ComponentMapper<PlayerStatsComponent> sm = ComponentMapper.getFor(PlayerStatsComponent.class);
+    private final ComponentMapper<TransformComponent>   tm = ComponentMapper.getFor(TransformComponent.class);
 
-    public PlayerInputSystem() {
+    private final Family enemyFamily;
+
+    public PlayerInputSystem(Family enemyFamily) {
         super(Family.all(PlayerInputComponent.class, VelocityComponent.class).get(), 1);
+        this.enemyFamily = enemyFamily;
     }
 
     @Override
@@ -67,6 +74,11 @@ public class PlayerInputSystem extends IteratingSystem {
                 // Utiliser la dernière direction enregistrée
                 combat.triggerAttack(input.lastDirX, input.lastDirY);
             }
+        }
+
+        // Sort (Capacity équipée) : Touche Q
+        if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
+            tryCastCapacity(entity, input);
         }
 
         // Switch arme : Touche X
@@ -106,5 +118,28 @@ public class PlayerInputSystem extends IteratingSystem {
                 break;
             }
         }
+    }
+
+    private void tryCastCapacity(Entity entity, PlayerInputComponent input) {
+        InventoryComponent inv = im.get(entity);
+        CombatComponent combat = cm.get(entity);
+        PlayerStatsComponent stats = sm.get(entity);
+        TransformComponent origin = tm.get(entity);
+        if (inv == null || inv.capacity == null || combat == null || stats == null || origin == null) return;
+        if (!combat.canUseCapacity()) return;
+
+        Capacity cap = inv.capacity;
+        CapacityBurst.BurstParams p = CapacityBurst.resolve(cap);
+        if (!stats.consumeStamina(p.staminaCost)) return;
+
+        combat.capacityTimer = p.cooldown;
+        combat.capacityBursting = true;
+        combat.capacityBurstTimer = 0.15f;
+        combat.attackDirX = input.lastDirX;
+        combat.attackDirY = input.lastDirY;
+
+        float castX = origin.x + input.lastDirX * (p.radius * 0.5f);
+        float castY = origin.y + input.lastDirY * (p.radius * 0.5f);
+        CapacityBurst.applyBurst(getEngine(), enemyFamily, castX, castY, p.damage, p.radius);
     }
 }

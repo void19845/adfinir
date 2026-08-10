@@ -32,6 +32,7 @@ import adfinir.game.save.SaveManager;
 import adfinir.game.ui.MiniMap;
 import adfinir.game.ui.InventoryOverlay;
 import adfinir.game.ui.LootBarOverlay;
+import adfinir.game.ui.ShopOverlay;
 import adfinir.game.ui.SocketInteractionState;
 import adfinir.game.ui.StatsOverlay;
 import com.badlogic.ashley.core.Engine;
@@ -77,6 +78,7 @@ public class GameScreen implements Screen {
     private StatsOverlay statsOverlay;
     private InventoryOverlay inventoryOverlay;
     private LootBarOverlay lootBarOverlay;
+    private ShopOverlay shopOverlay;
     private SocketInteractionState socketInteraction;
     private MiniMap      miniMap;
     private OrthographicCamera uiCamera;
@@ -97,6 +99,9 @@ public class GameScreen implements Screen {
 
     /** Sauvegarde à restaurer au premier show(), ou null pour une nouvelle partie. */
     private SaveData pendingLoad;
+
+    /** Famille stable (ne dépend pas de l'étage) utilisée par CombatSystem pour cibler les ennemis. */
+    private Family enemyFamily;
 
     /** Nouvelle partie. */
     public GameScreen(Main game) {
@@ -149,11 +154,11 @@ public class GameScreen implements Screen {
         float threatFactor = getThreatFactor();
 
         if (firstFloor) {
+            enemyFamily = Family.all(EnemyStatsComponent.class, TransformComponent.class).get();
+
             engine = new Engine();
-            engine.addSystem(new DeathSystem());
             engine.addSystem(new StatsSystem());
-            engine.addSystem(new CombatSystem());
-            engine.addSystem(new PlayerInputSystem());
+            engine.addSystem(new PlayerInputSystem(enemyFamily));
             engine.addSystem(new MovementSystem(dungeonMap));
             engine.addSystem(new RenderSystem(shapeRenderer));
 
@@ -200,6 +205,7 @@ public class GameScreen implements Screen {
                 // (au cas où l'équipement rechargé donnerait un max différent).
                 playerStats.currentHp      = Math.min(pendingLoad.currentHp, playerStats.stats.maxHp());
                 playerStats.currentStamina = Math.min(pendingLoad.currentStamina, playerStats.stats.maxStamina());
+                playerStats.gold           = pendingLoad.gold;
                 lootBar = SaveManager.toLootBar(pendingLoad);
                 pendingLoad = null; // sauvegarde consommée
             } else {
@@ -217,10 +223,13 @@ public class GameScreen implements Screen {
             player.add(inventory);
             player.add(lootBar);
             engine.addEntity(player);
+            engine.addSystem(new CombatSystem(player, enemyFamily));
+            engine.addSystem(new DeathSystem(player));
 
             statsOverlay = new StatsOverlay();
             inventoryOverlay = new InventoryOverlay();
             lootBarOverlay = new LootBarOverlay();
+            shopOverlay = new ShopOverlay();
             socketInteraction = new SocketInteractionState();
             miniMap      = new MiniMap();
             uiCamera     = new OrthographicCamera();
@@ -378,6 +387,12 @@ public class GameScreen implements Screen {
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             inventoryOverlay.toggle();
         }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+            shopOverlay.toggle();
+        }
+        if (shopOverlay.isVisible()) {
+            shopOverlay.update(delta, player.getComponent(LootBarComponent.class), playerStats);
+        }
 
         totalTime += delta;
         transitionAlpha = Math.max(0f, transitionAlpha - delta / 0.6f);
@@ -469,6 +484,8 @@ public class GameScreen implements Screen {
 
         lootBarOverlay.draw();
 
+        shopOverlay.draw(screenW, screenH, player.getComponent(LootBarComponent.class), playerStats);
+
         shapeRenderer.setProjectionMatrix(uiCamera.combined);
         miniMap.draw(shapeRenderer, dungeonMap, playerTransform, screenW, screenH);
 
@@ -511,6 +528,7 @@ public class GameScreen implements Screen {
         statsOverlay.resize(w, h);
         inventoryOverlay.resize(w, h);
         lootBarOverlay.resize(w, h);
+        shopOverlay.resize(w, h);
         uiCamera.viewportWidth = w;
         uiCamera.viewportHeight = h;
         uiCamera.position.set(w / 2f, h / 2f, 0);
@@ -527,5 +545,6 @@ public class GameScreen implements Screen {
         statsOverlay.dispose();
         inventoryOverlay.dispose();
         lootBarOverlay.dispose();
+        shopOverlay.dispose();
     }
 }
