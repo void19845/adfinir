@@ -2,6 +2,7 @@ package adfinir.game.ecs.systems;
 
 import adfinir.game.ecs.components.CapacityComponent;
 import adfinir.game.ecs.components.CombatComponent;
+import adfinir.game.ecs.components.DashComponent;
 import adfinir.game.ecs.components.InventoryComponent;
 import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
@@ -29,6 +30,7 @@ public class PlayerInputSystem extends IteratingSystem {
     private final ComponentMapper<PlayerInputComponent> pm = ComponentMapper.getFor(PlayerInputComponent.class);
     private final ComponentMapper<CombatComponent>      cm = ComponentMapper.getFor(CombatComponent.class);
     private final ComponentMapper<CapacityComponent>    capm = ComponentMapper.getFor(CapacityComponent.class);
+    private final ComponentMapper<DashComponent>        dam = ComponentMapper.getFor(DashComponent.class);
     private final ComponentMapper<InventoryComponent>   im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<LootBarComponent>     lbm = ComponentMapper.getFor(LootBarComponent.class);
     private final ComponentMapper<PlayerStatsComponent> sm = ComponentMapper.getFor(PlayerStatsComponent.class);
@@ -71,9 +73,14 @@ public class PlayerInputSystem extends IteratingSystem {
             }
         }
 
-        // Sort (Capacity équipée) : Clic droit (JustPressed)
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+        // Sort (Capacity équipée) : Touche Q — chaque compétence a sa touche dédiée
+        if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
             tryCastCapacity(entity, input);
+        }
+
+        // Dash : Touche Tab
+        if (Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
+            tryDash(entity, input);
         }
 
         // Switch arme : Touche X
@@ -127,5 +134,15 @@ public class PlayerInputSystem extends IteratingSystem {
         if (!stats.consumeStamina(CAPACITY_STAMINA_COST)) return;
 
         capacityComp.trigger(input.lastDirX, input.lastDirY, inv.capacity.getActiveEffect().cooldown);
+    }
+
+    private void tryDash(Entity entity, PlayerInputComponent input) {
+        DashComponent dash = dam.get(entity);
+        PlayerStatsComponent stats = sm.get(entity);
+        if (dash == null || stats == null) return;
+        if (!dash.canDash()) return;
+        if (!stats.consumeStamina(DashSystem.STAMINA_COST)) return;
+
+        dash.trigger(input.lastDirX, input.lastDirY, DashSystem.COOLDOWN, DashSystem.DURATION);
     }
 }

@@ -29,6 +29,27 @@ public class SocketInteractionState {
     /** Mod survolé (pas cliqué) dans la loot bar cette frame — réinitialisé à chaque frame. */
     public ItemModifier hoverPreviewMod;
 
+    // --- Glisser-déposer d'un item standard (Weapon/Armor/Capacity/Artifact) depuis la loot bar ---
+    // Mécanique distincte du "tenu en main" des mods ci-dessus (presser-glisser-relâcher plutôt que
+    // clic-puis-clic), gérée par LootBarOverlay (origine) et InventoryOverlay (cible, voir
+    // tryDropOnActiveSlot()).
+    public Item dragItem;
+    public int dragFromLootBarIndex = -1;
+
+    public boolean isDraggingItem() {
+        return dragItem != null;
+    }
+
+    public void startDragItem(Item item, int lootBarIndex) {
+        dragItem = item;
+        dragFromLootBarIndex = lootBarIndex;
+    }
+
+    public void clearDrag() {
+        dragItem = null;
+        dragFromLootBarIndex = -1;
+    }
+
     public boolean isHolding() {
         return heldMod != null;
     }

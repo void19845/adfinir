@@ -50,6 +50,8 @@ public class LootBarOverlay implements Disposable {
     private static final float SPACING       = SLOT_SIZE + SLOT_GAP;
     private static final float BOTTOM_MARGIN = 14f;
     private static final float DETAIL_SCALE  = 1.0f;
+    /** Distance (px écran) au-delà de laquelle un clic-maintenu devient un glisser plutôt qu'un clic. */
+    private static final float DRAG_THRESHOLD = 6f;
 
     private final SpriteBatch   batch;
     private final BitmapFont    font;
@@ -62,6 +64,10 @@ public class LootBarOverlay implements Disposable {
     private CombatComponent       combat;
     private PlayerStatsComponent  playerStats;
     private SocketInteractionState interaction;
+
+    /** Case sous le bouton depuis le dernier press gauche, -1 si aucun. Sert à distinguer clic vs glisser. */
+    private int pressedIndex = -1;
+    private float pressStartX, pressStartY;
 
     public LootBarOverlay() {
         batch  = new SpriteBatch();
@@ -82,10 +88,18 @@ public class LootBarOverlay implements Disposable {
     }
 
     /**
-     * Capte la sélection clavier [1]-[8] et le clic souris sur une case.
+     * Capte la sélection clavier [1]-[8] et le clic/glisser souris sur une case.
      * À appeler une fois par frame (indépendamment de draw()).
+     *
+     * Un item standard (pas un ItemModifier) pressé puis déplacé au-delà de
+     * DRAG_THRESHOLD devient un glisser (SocketInteractionState.dragItem) :
+     * au relâchement, on tente de l'équiper via inventoryOverlay si le
+     * curseur est sur son emplacement actif ; sinon rien ne se passe (le
+     * geste est annulé, l'item reste dans la barre). Un simple clic (pas de
+     * déplacement significatif) garde le comportement historique : équipe
+     * immédiatement (item standard) ou "tient en main" (ItemModifier).
      */
-    public void handleInput() {
+    public void handleInput(InventoryOverlay inventoryOverlay) {
         if (bar == null || inventory == null || playerStats == null) return;
 
         for (int i = 0; i < SLOT_COUNT; i++) {
@@ -98,7 +112,42 @@ public class LootBarOverlay implements Disposable {
 
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             int hovered = hoveredIndex();
-            if (hovered >= 0) select(hovered);
+            if (hovered >= 0 && bar.slots[hovered] != null) {
+                pressedIndex = hovered;
+                pressStartX = Gdx.input.getX();
+                pressStartY = Gdx.input.getY();
+            }
+        }
+
+        if (pressedIndex >= 0 && Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+            Item item = bar.slots[pressedIndex];
+            if (item == null) {
+                pressedIndex = -1;
+            } else if (interaction != null && !interaction.isDraggingItem() && !(item instanceof ItemModifier)) {
+                float dx = Gdx.input.getX() - pressStartX;
+                float dy = Gdx.input.getY() - pressStartY;
+                if (dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
+                    interaction.startDragItem(item, pressedIndex);
+                }
+            }
+        }
+
+        // libGDX 1.14 n'a pas isButtonJustReleased() : on détecte le relâchement en comparant
+        // à l'état "en attente" (pressedIndex / drag en cours) laissé par les blocs ci-dessus.
+        boolean releasedNow = !Gdx.input.isButtonPressed(Input.Buttons.LEFT)
+            && (pressedIndex >= 0 || (interaction != null && interaction.isDraggingItem()));
+        if (releasedNow) {
+            if (interaction != null && interaction.isDraggingItem() && interaction.dragFromLootBarIndex == pressedIndex) {
+                float mx = Gdx.input.getX();
+                float my = screenH - Gdx.input.getY();
+                if (inventoryOverlay != null) {
+                    inventoryOverlay.tryDropOnActiveSlot(interaction.dragItem, interaction.dragFromLootBarIndex, mx, my);
+                }
+                interaction.clearDrag();
+            } else if (pressedIndex >= 0) {
+                select(pressedIndex); // pas de glisser réel : comportement historique du simple clic
+            }
+            pressedIndex = -1;
         }
     }
 
@@ -237,6 +286,44 @@ public class LootBarOverlay implements Disposable {
         }
 
         batch.end();
+
+        drawDraggedIcon();
+    }
+
+    /** Icône flottante qui suit le curseur pendant un glisser (voir handleInput()). */
+    private void drawDraggedIcon() {
+        if (interaction == null || !interaction.isDraggingItem() || interaction.dragFromLootBarIndex < 0) return;
+
+        Item item = interaction.dragItem;
+        float cx = Gdx.input.getX();
+        float cy = screenH - Gdx.input.getY();
+        float half = SLOT_SIZE / 2f;
+
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        UiTheme.slotSunken(shapes, cx - half, cy - half, SLOT_SIZE, SLOT_SIZE, UiTheme.SLOT_BG_SELECT);
+        if (!(item instanceof Weapon)) {
+            float pad = 6f;
+            ItemIcon.draw(shapes, item, cx - half + pad, cy - half + pad, SLOT_SIZE - pad * 2, SLOT_SIZE - pad * 2);
+        }
+        shapes.end();
+
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(ItemDetails.rarityColor(item.rarity));
+        shapes.rect(cx - half, cy - half, SLOT_SIZE, SLOT_SIZE);
+        shapes.end();
+
+        if (item instanceof Weapon) {
+            batch.begin();
+            float pad = 5f;
+            float maxDim = SLOT_SIZE - pad * 2;
+            TextureRegion region = WeaponSpriteManager.getRegion(((Weapon) item).type);
+            float w = region.getRegionWidth();
+            float h = region.getRegionHeight();
+            float scale = Math.min(maxDim / w, maxDim / h);
+            float finalW = w * scale, finalH = h * scale;
+            batch.draw(region, cx - finalW / 2f, cy - finalH / 2f, finalW, finalH);
+            batch.end();
+        }
     }
 
     /** bottomY = bas de l'infobulle (juste au-dessus de la case) ; le bloc entier s'étend vers le haut. */

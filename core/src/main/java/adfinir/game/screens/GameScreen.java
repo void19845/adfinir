@@ -6,6 +6,7 @@ import adfinir.game.dungeon.DungeonMap;
 import adfinir.game.dungeon.DungeonRenderer;
 import adfinir.game.ecs.components.CapacityComponent;
 import adfinir.game.ecs.components.CombatComponent;
+import adfinir.game.ecs.components.DashComponent;
 import adfinir.game.ecs.components.EnemyAIComponent;
 import adfinir.game.ecs.components.EnemyStatsComponent;
 import adfinir.game.ecs.components.LootBarComponent;
@@ -18,6 +19,7 @@ import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
 import adfinir.game.ecs.systems.CapacitySystem;
 import adfinir.game.ecs.systems.CombatSystem;
+import adfinir.game.ecs.systems.DashSystem;
 import adfinir.game.ecs.systems.DeathSystem;
 import adfinir.game.ecs.systems.EnemyAttackSystem;
 import adfinir.game.ecs.systems.EnemyMovementSystem;
@@ -164,6 +166,7 @@ public class GameScreen implements Screen {
             engine.addSystem(new StatsSystem());
             engine.addSystem(new PlayerInputSystem());
             engine.addSystem(new CapacitySystem());
+            engine.addSystem(new DashSystem(enemyFamily));
             engine.addSystem(new MovementSystem(dungeonMap));
             engine.addSystem(new ProjectileSystem(dungeonMap));
             engine.addSystem(new RenderSystem(shapeRenderer));
@@ -191,6 +194,7 @@ public class GameScreen implements Screen {
             playerStats = new PlayerStatsComponent();
             CombatComponent playerCombat = new CombatComponent();
             CapacityComponent playerCapacity = new CapacityComponent();
+            DashComponent playerDash = new DashComponent();
 
             InventoryComponent inventory;
             if (pendingLoad != null) {
@@ -228,6 +232,7 @@ public class GameScreen implements Screen {
             player.add(playerStats);
             player.add(playerCombat);
             player.add(playerCapacity);
+            player.add(playerDash);
             player.add(inventory);
             player.add(lootBar);
             engine.addEntity(player);
@@ -418,10 +423,11 @@ public class GameScreen implements Screen {
             player.getComponent(CombatComponent.class),
             playerStats,
             socketInteraction);
-        lootBarOverlay.handleInput();
+        lootBarOverlay.handleInput(inventoryOverlay);
 
         inventoryOverlay.update(player.getComponent(InventoryComponent.class),
             player.getComponent(LootBarComponent.class),
+            player.getComponent(CombatComponent.class),
             playerStats.stats,
             socketInteraction);
         inventoryOverlay.handleInput();
@@ -442,6 +448,7 @@ public class GameScreen implements Screen {
             engine.getSystem(PlayerInputSystem.class).update(delta);
         }
         engine.getSystem(CapacitySystem.class).update(delta);
+        engine.getSystem(DashSystem.class).update(delta);
         engine.getSystem(EnemyMovementSystem.class).update(delta);
         engine.getSystem(EnemyAttackSystem.class).update(delta);
         engine.getSystem(MovementSystem.class).update(delta);

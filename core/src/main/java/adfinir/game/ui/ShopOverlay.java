@@ -14,27 +14,32 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Disposable;
 
 import java.util.List;
 
 /**
- * Boutique (touche P) : 5 objets aléatoires à acheter avec l'or.
- * Un achat rejoint la loot bar (premier slot libre) — même point d'entrée que
- * le ramassage au sol (LootPickupSystem) ; l'équipement se fait ensuite via
- * la touche 1-8 ou un clic sur la barre, comme pour tout autre loot.
+ * Boutique (touche P) : 5 objets par catégorie (Armes/Armures/Capacités/
+ * Artéfacts) à acheter avec l'or, organisés en onglets. Un achat rejoint la
+ * loot bar (premier slot libre) — même point d'entrée que le ramassage au
+ * sol (LootPickupSystem) ; l'équipement se fait ensuite via la touche 1-8
+ * ou un clic sur la barre, comme pour tout autre loot.
  */
 public class ShopOverlay implements Disposable {
 
-    private static final int OFFER_COUNT = 5;
+    private enum Category { WEAPON, ARMOR, CAPACITY, ARTIFACT }
+    private static final Category[] CATEGORIES = Category.values();
+    private static final String[] CATEGORY_LABELS = { "Armes", "Armures", "Capacités", "Artéfacts" };
+
+    private static final int OFFERS_PER_CAT = 5;
     private static final float BOX_W = 340f;
-    private static final float BOX_H = 340f;
+    private static final float BOX_H = 372f;
     private static final float ROW_H = 56f;
     private static final float ROW_GAP = 6f;
     private static final float PADDING = 15f;
     private static final float ICON_BOX = 42f;
+    private static final float TAB_H = 26f;
     private static final float FLASH_DURATION = 1.2f;
 
     private static final Color GOLD_ACCENT = new Color(0.85f, 0.68f, 0.25f, 1f);
@@ -44,8 +49,9 @@ public class ShopOverlay implements Disposable {
     private final ShapeRenderer shapes;
 
     private boolean visible = false;
-    private final Item[] offers = new Item[OFFER_COUNT];
-    private final int[] prices = new int[OFFER_COUNT];
+    private final Item[][] offers = new Item[CATEGORIES.length][OFFERS_PER_CAT];
+    private final int[][]  prices = new int[CATEGORIES.length][OFFERS_PER_CAT];
+    private int selectedCategory = 0;
 
     private float flashTimer = 0f;
     private String flashText = "";
@@ -65,18 +71,25 @@ public class ShopOverlay implements Disposable {
     }
 
     private void rollOffers() {
-        for (int i = 0; i < OFFER_COUNT; i++) {
-            Item item;
-            switch (MathUtils.random(3)) {
-                case 0:  item = ItemGenerator.generateWeapon(); break;
-                case 1:  item = ItemGenerator.generateArmor(); break;
-                case 2:  item = ItemGenerator.generateCapacity(); break;
-                default: item = ItemGenerator.generateArtifact(); break;
+        for (int c = 0; c < CATEGORIES.length; c++) {
+            for (int i = 0; i < OFFERS_PER_CAT; i++) {
+                Item item = generateForCategory(CATEGORIES[c]);
+                offers[c][i] = item;
+                prices[c][i] = ItemGenerator.priceFor(item.rarity);
             }
-            offers[i] = item;
-            prices[i] = ItemGenerator.priceFor(item.rarity);
         }
+        selectedCategory = 0;
         flashTimer = 0f;
+    }
+
+    private static Item generateForCategory(Category cat) {
+        switch (cat) {
+            case WEAPON:   return ItemGenerator.generateWeapon();
+            case ARMOR:    return ItemGenerator.generateArmor();
+            case CAPACITY: return ItemGenerator.generateCapacity();
+            case ARTIFACT:
+            default:       return ItemGenerator.generateArtifact();
+        }
     }
 
     /** Gère les achats au clavier (touches 1-5) et le décompte du flash de retour. */
@@ -85,16 +98,17 @@ public class ShopOverlay implements Disposable {
         if (flashTimer > 0f) flashTimer -= delta;
 
         int[] keys = { Input.Keys.NUM_1, Input.Keys.NUM_2, Input.Keys.NUM_3, Input.Keys.NUM_4, Input.Keys.NUM_5 };
-        for (int i = 0; i < OFFER_COUNT; i++) {
-            if (offers[i] != null && Gdx.input.isKeyJustPressed(keys[i])) {
+        Item[] current = offers[selectedCategory];
+        for (int i = 0; i < OFFERS_PER_CAT; i++) {
+            if (current[i] != null && Gdx.input.isKeyJustPressed(keys[i])) {
                 buy(i, bar, stats);
             }
         }
     }
 
     private void buy(int index, LootBarComponent bar, PlayerStatsComponent stats) {
-        Item item = offers[index];
-        int price = prices[index];
+        Item item = offers[selectedCategory][index];
+        int price = prices[selectedCategory][index];
 
         int slot = bar.firstEmptySlot();
         if (slot == -1) {
@@ -112,7 +126,7 @@ public class ShopOverlay implements Disposable {
 
         flashTimer = FLASH_DURATION;
         flashText = "Acheté : " + item.name + " !";
-        offers[index] = null; // vendu : slot vide jusqu'à la prochaine ouverture
+        offers[selectedCategory][index] = null; // vendu : slot vide jusqu'à la prochaine ouverture
     }
 
     public void draw(int screenW, int screenH, LootBarComponent bar, PlayerStatsComponent stats) {
@@ -127,16 +141,38 @@ public class ShopOverlay implements Disposable {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
+        // Onglets de catégorie
+        float tabY = boxY + BOX_H - PADDING - TAB_H;
+        float tabW = (BOX_W - PADDING * 2) / CATEGORIES.length;
+        int hoveredTab = -1;
+        for (int c = 0; c < CATEGORIES.length; c++) {
+            float tx = boxX + PADDING + c * tabW;
+            if (mouseX >= tx && mouseX <= tx + tabW && mouseY >= tabY && mouseY <= tabY + TAB_H) {
+                hoveredTab = c;
+                if (clicked) selectedCategory = c;
+            }
+        }
+
+        Item[] current = offers[selectedCategory];
+        int[]  currentPrices = prices[selectedCategory];
         Item hoveredItem = null;
-        float rowTop = boxY + BOX_H - PADDING - 40f;
+        // rowY(0) = juste sous les onglets (10px de marge) ; rowY(i) descend de ROW_H+ROW_GAP à chaque ligne.
+        float rowY0 = tabY - 10f - ROW_H;
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         UiTheme.panel(shapes, boxX, boxY, BOX_W, BOX_H);
-        for (int i = 0; i < OFFER_COUNT; i++) {
-            float rowY = rowTop - i * (ROW_H + ROW_GAP);
+
+        for (int c = 0; c < CATEGORIES.length; c++) {
+            float tx = boxX + PADDING + c * tabW;
+            Color tabBg = c == selectedCategory ? UiTheme.SLOT_BG_SELECT : (c == hoveredTab ? UiTheme.SLOT_BG_HOVER : UiTheme.SLOT_BG);
+            UiTheme.slotSunken(shapes, tx, tabY, tabW - 2f, TAB_H, tabBg);
+        }
+
+        for (int i = 0; i < OFFERS_PER_CAT; i++) {
+            float rowY = rowY0 - i * (ROW_H + ROW_GAP);
             boolean hovered = mouseX >= boxX + PADDING && mouseX <= boxX + BOX_W - PADDING
                 && mouseY >= rowY && mouseY <= rowY + ROW_H;
-            Item item = offers[i];
+            Item item = current[i];
 
             Color rowBg = item == null ? UiTheme.SLOT_BG_EMPTY : (hovered ? UiTheme.SLOT_BG_HOVER : UiTheme.SLOT_BG);
             UiTheme.slotSunken(shapes, boxX + PADDING, rowY, BOX_W - PADDING * 2, ROW_H, rowBg);
@@ -158,9 +194,14 @@ public class ShopOverlay implements Disposable {
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(GOLD_ACCENT);
         shapes.rect(boxX, boxY, BOX_W, BOX_H);
-        for (int i = 0; i < OFFER_COUNT; i++) {
-            float rowY = rowTop - i * (ROW_H + ROW_GAP);
-            Item item = offers[i];
+        for (int c = 0; c < CATEGORIES.length; c++) {
+            float tx = boxX + PADDING + c * tabW;
+            shapes.setColor(c == selectedCategory ? GOLD_ACCENT : UiTheme.TEXT_DIM);
+            shapes.rect(tx, tabY, tabW - 2f, TAB_H);
+        }
+        for (int i = 0; i < OFFERS_PER_CAT; i++) {
+            float rowY = rowY0 - i * (ROW_H + ROW_GAP);
+            Item item = current[i];
             shapes.setColor(item == null ? UiTheme.TEXT_DIM : ItemDetails.rarityColor(item.rarity));
             shapes.rect(boxX + PADDING, rowY, BOX_W - PADDING * 2, ROW_H);
         }
@@ -168,11 +209,17 @@ public class ShopOverlay implements Disposable {
 
         batch.begin();
 
+        for (int c = 0; c < CATEGORIES.length; c++) {
+            float tx = boxX + PADDING + c * tabW;
+            font.setColor(c == selectedCategory ? GOLD_ACCENT : UiTheme.TEXT_BODY);
+            font.draw(batch, CATEGORY_LABELS[c], tx, tabY + TAB_H - 7f, tabW - 2f, Align.center, false);
+        }
+
         float textX = boxX + PADDING + 6f + ICON_BOX + 10f;
         float textW = BOX_W - PADDING * 2 - (textX - (boxX + PADDING)) - 8f;
-        for (int i = 0; i < OFFER_COUNT; i++) {
-            float rowY = rowTop - i * (ROW_H + ROW_GAP);
-            Item item = offers[i];
+        for (int i = 0; i < OFFERS_PER_CAT; i++) {
+            float rowY = rowY0 - i * (ROW_H + ROW_GAP);
+            Item item = current[i];
             if (item instanceof Weapon) {
                 float iconX = boxX + PADDING + 6f;
                 float iconY = rowY + (ROW_H - ICON_BOX) / 2f;
@@ -187,7 +234,7 @@ public class ShopOverlay implements Disposable {
                 font.setColor(ItemDetails.rarityColor(item.rarity));
                 font.draw(batch, "[" + (i + 1) + "] " + item.name, textX, rowY + ROW_H - 12f, textW, Align.left, true);
                 font.setColor(GOLD_ACCENT);
-                font.draw(batch, prices[i] + " or", textX, rowY + 18f);
+                font.draw(batch, currentPrices[i] + " or", textX, rowY + 18f);
             } else {
                 font.setColor(UiTheme.TEXT_DIM);
                 font.draw(batch, "[" + (i + 1) + "] -- vendu --", textX, rowY + ROW_H - 12f);
@@ -199,7 +246,7 @@ public class ShopOverlay implements Disposable {
         font.draw(batch, "BOUTIQUE", boxX + PADDING, boxY + BOX_H - PADDING - 2f);
         font.getData().setScale(1f);
         font.setColor(GOLD_ACCENT);
-        font.draw(batch, stats.gold + " or", boxX + PADDING, boxY + BOX_H - PADDING - 20f);
+        font.draw(batch, stats.gold + " or", boxX + PADDING, boxY + BOX_H - PADDING - 18f);
         font.setColor(UiTheme.TEXT_DIM);
         font.draw(batch, "[P] fermer", boxX + PADDING, boxY + PADDING);
         if (flashTimer > 0f) {
