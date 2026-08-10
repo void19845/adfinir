@@ -38,9 +38,16 @@ public class CombatSystem extends IteratingSystem {
         if (combat.isAttacking) {
             // L'attaque est active tant que le timer est proche du cooldown max
             // On considère l'attaque active pendant la durée spécifiée par l'attaque actuelle du combo
-            WeaponAttack currentAttack = weapon.comboSlots.get(combat.comboIndex);
-            if (combat.timer < currentAttack.cooldown - currentAttack.duration) {
+            // (combo effectif = base + attaques des WeaponComboMod socketés)
+            java.util.List<WeaponAttack> activeCombo = weapon.getActiveCombo();
+            if (combat.comboIndex >= activeCombo.size()) {
+                // Un socket a changé pendant l'attaque (combo raccourci) : on coupe proprement.
                 combat.isAttacking = false;
+            } else {
+                WeaponAttack currentAttack = activeCombo.get(combat.comboIndex);
+                if (combat.timer < currentAttack.cooldown - currentAttack.duration) {
+                    combat.isAttacking = false;
+                }
             }
         }
     }

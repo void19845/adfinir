@@ -2,13 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Environment Setup
-To set up the development environment, please follow these steps:
-1. **Install Java**: Ensure you have Java 8 or higher installed.
-2. **Install Gradle**: Ensure you have Gradle installed.
-3. **Clone the Repository**: Clone the repository to your local machine using `git clone <repository-url>`.
-4. **Navigate to the Project Directory**: Change into the project directory using `cd <project-directory>`.
-
 ## Development Commands
 - Build all modules: `./gradlew build`
 - Run desktop application: `./gradlew lwjgl3:run`
@@ -16,36 +9,20 @@ To set up the development environment, please follow these steps:
 - Clean build artifacts: `./gradlew clean`
 - Create runnable JAR for desktop: `./gradlew lwjgl3:jar`
 
-## Dependencies
-The project uses the following dependencies:
-- **libGDX**: For game development.
-- **Ashley ECS Framework**: For managing game entities and systems.
-- **LWJGL3**: For desktop-specific rendering.
-
-## Contribution Guidelines
-To contribute to this project, please follow these guidelines:
-1. **Fork the Repository**: Fork the repository on GitHub.
-2. **Create a New Branch**: Create a new branch for your changes.
-3. **Make Changes**: Make your changes in the new branch.
-4. **Commit Changes**: Commit your changes with descriptive commit messages.
-5. **Push Changes**: Push your changes to your forked repository.
-6. **Create a Pull Request**: Create a pull request from your forked repository to the main repository.
+## Coding Guidelines
+### General Principles
+- **Before Any Action**: Verify required files; zero assumptions; stop and ask if data is missing or ambiguous.
+- **Communication**: Tight responses (bullet points/short sentences), no preambles, no unnecessary conclusions.
+- **Before Coding**: State assumptions explicitly; surface tradeoffs; stop if unclear.
+- **While Coding**: Minimum code that solves the problem; no speculative features or over-abstraction.
+- **Surgical Changes**: Touch only what is requested; match existing style; no unrequested refactors.
+- **Goal-Driven Execution**: Transform tasks into verifiable goals; provide brief plans with checkpoints.
 
 ## Project Architecture
 This is a libGDX project using a multi-module Gradle structure.
 - `core`: Contains the main application logic, game state, and shared resources.
-  - **Responsibilities**:
-    - Manages game entities and systems using Ashley ECS.
-    - Handles procedural dungeon generation using BSP (Binary Space Partitioning).
-    - Manages player stats and input handling.
-    - Manages screen transitions and UI rendering.
 - `lwjgl3`: The desktop-specific entry point and configuration using the LWJGL3 backend.
-  - **Responsibilities**:
-    - Initializes the game window and rendering context.
-    - Handles platform-specific configurations.
 - `assets`: Contains UI skins, fonts, and other game assets.
-  - **Responsibilities**:
-    - Stores all visual and audio resources used in the game.
 
 ### Game Engine & Logic (`core`)
 The project implements a 2D dungeon crawler with the following key systems:

@@ -14,6 +14,7 @@ public class DungeonRenderer {
     private static final Color COLOR_WALL  = new Color(0.45f, 0.43f, 0.40f, 1f);
     private static final Color COLOR_GRID  = new Color(0.12f, 0.11f, 0.10f, 1f);
     private static final Color COLOR_EXIT  = new Color(0.10f, 0.80f, 0.30f, 1f); // vert vif
+    private static final Color COLOR_LOOT  = new Color(1.00f, 0.85f, 0.20f, 1f); // doré
 
     private final DungeonMap map;
 
@@ -59,6 +60,14 @@ public class DungeonRenderer {
                         sr.setColor(COLOR_EXIT);
                         float margin = ts * 0.2f;
                         sr.rect(px + margin, py + margin, ts - margin * 2, ts - margin * 2);
+                        break;
+                    case DungeonMap.TILE_LOOT:
+                        // Fond de sol + losange doré centré (visible même après ramassage de l'objet)
+                        sr.setColor(COLOR_FLOOR);
+                        sr.rect(px, py, ts, ts);
+                        sr.setColor(COLOR_LOOT);
+                        float lm = ts * 0.3f;
+                        sr.rect(px + lm, py + lm, ts - lm * 2, ts - lm * 2);
                         break;
                     default:
                         break;

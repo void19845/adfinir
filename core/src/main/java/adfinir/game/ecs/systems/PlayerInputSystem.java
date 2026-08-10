@@ -2,7 +2,9 @@ package adfinir.game.ecs.systems;
 
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.InventoryComponent;
+import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
+import adfinir.game.ecs.components.PlayerStatsComponent;
 import adfinir.game.ecs.components.VelocityComponent;
 import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.inventory.Weapon;
@@ -16,10 +18,18 @@ import com.badlogic.gdx.Input;
 
 public class PlayerInputSystem extends IteratingSystem {
 
+    /** Touches 1 à 8 : sélectionnent/équipent le slot correspondant de la barre de loot. */
+    private static final int[] BAR_SELECT_KEYS = {
+        Input.Keys.NUM_1, Input.Keys.NUM_2, Input.Keys.NUM_3, Input.Keys.NUM_4,
+        Input.Keys.NUM_5, Input.Keys.NUM_6, Input.Keys.NUM_7, Input.Keys.NUM_8
+    };
+
     private final ComponentMapper<VelocityComponent>    vm = ComponentMapper.getFor(VelocityComponent.class);
     private final ComponentMapper<PlayerInputComponent> pm = ComponentMapper.getFor(PlayerInputComponent.class);
     private final ComponentMapper<CombatComponent>      cm = ComponentMapper.getFor(CombatComponent.class);
     private final ComponentMapper<InventoryComponent>   im = ComponentMapper.getFor(InventoryComponent.class);
+    private final ComponentMapper<LootBarComponent>     lbm = ComponentMapper.getFor(LootBarComponent.class);
+    private final ComponentMapper<PlayerStatsComponent> sm = ComponentMapper.getFor(PlayerStatsComponent.class);
 
     public PlayerInputSystem() {
         super(Family.all(PlayerInputComponent.class, VelocityComponent.class).get(), 1);
@@ -81,6 +91,19 @@ public class PlayerInputSystem extends IteratingSystem {
                 if (combat != null) {
                     combat.weapon = inv.weapon;
                 }
+            }
+        }
+
+        // Sélection/équipement depuis la barre de loot : touches 1 à 8
+        for (int i = 0; i < BAR_SELECT_KEYS.length; i++) {
+            if (Gdx.input.isKeyJustPressed(BAR_SELECT_KEYS[i])) {
+                LootBarComponent bar = lbm.get(entity);
+                InventoryComponent inv = im.get(entity);
+                PlayerStatsComponent stats = sm.get(entity);
+                if (bar != null && inv != null && stats != null) {
+                    inv.equipFromBarAndSync(bar, i, cm.get(entity), stats.stats);
+                }
+                break;
             }
         }
     }
