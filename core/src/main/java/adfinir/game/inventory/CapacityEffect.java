@@ -7,14 +7,16 @@ public class CapacityEffect {
     public final String name;
     public final float baseDamage;
     public final float speed;
-    public final float radius;
+    public final float radius; // rayon de collision du projectile
     public final String type; // "FIRE", "ICE", "ELECTRIC", etc.
+    public final float cooldown; // délai de cast, en secondes
 
-    public CapacityEffect(String name, float baseDamage, float speed, float radius, String type) {
+    public CapacityEffect(String name, float baseDamage, float speed, float radius, String type, float cooldown) {
         this.name = name;
         this.baseDamage = baseDamage;
         this.speed = speed;
         this.radius = radius;
         this.type = type;
+        this.cooldown = cooldown;
     }
 }
