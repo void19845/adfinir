@@ -6,11 +6,13 @@ import com.badlogic.ashley.core.Component;
 
 /**
  * Composant gérant l'équipement du joueur.
- * Gère 4 slots : Weapon, Capacity, Armor, Artifact.
+ * Gère : Weapon, Armor, Artifact (1 slot chacun) et 4 slots de sorts (Capacity).
  */
 public class InventoryComponent implements Component {
+    public static final int SPELL_SLOTS = 4;
+
     public Weapon weapon;
-    public Capacity capacity;
+    public Capacity[] spells = new Capacity[SPELL_SLOTS];
     public Armor armor;
     public Artifact artifact;
 
@@ -38,8 +40,20 @@ public class InventoryComponent implements Component {
         this.weapon = newWeapon;
     }
 
-    public void equipCapacity(Capacity newCapacity) {
-        this.capacity = newCapacity;
+    public void equipSpell(int slot, Capacity newCapacity) {
+        if (slot < 0 || slot >= SPELL_SLOTS) return;
+        spells[slot] = newCapacity;
+    }
+
+    /** Équipe un sort dans le premier slot libre, ou remplace le slot 0 si tout est occupé. */
+    public void equipSpellAuto(Capacity newCapacity) {
+        for (int i = 0; i < SPELL_SLOTS; i++) {
+            if (spells[i] == null) {
+                spells[i] = newCapacity;
+                return;
+            }
+        }
+        spells[0] = newCapacity;
     }
 
     public void equipArmor(Armor newArmor) {

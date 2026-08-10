@@ -17,6 +17,7 @@ public class EnemyStatsComponent implements Component, Pool.Poolable {
     public float currentHp;
     public float maxHp = 50f;
     public float def = 2f;
+    public float atk = 8f;
     public boolean isDead = false;
     public EnemyType type;
 

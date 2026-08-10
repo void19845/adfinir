@@ -20,12 +20,14 @@ public class Weapon extends Item {
     }
 
     /**
-     * Calcule les dégâts d'une attaque en tenant compte de la rareté et du type d'arme.
+     * Calcule les dégâts d'une attaque en tenant compte de la rareté, du type d'arme
+     * et de la stat du porteur (ATK pour une attaque physique, MAG si l'attaque a un élément).
      */
-    public float getModifiedDamage(int attackIndex) {
+    public float getModifiedDamage(int attackIndex, float atk, float mag) {
         if (attackIndex < 0 || attackIndex >= comboSlots.size()) return 0;
         WeaponAttack attack = comboSlots.get(attackIndex);
-        return attack.getRandomDamage() * rarity.statMultiplier * type.damageMod;
+        float statContribution = (attack.element != null) ? mag : atk;
+        return (attack.getRandomDamage() + statContribution) * rarity.statMultiplier * type.damageMod;
     }
 
     public float getModifiedCooldown(int attackIndex) {

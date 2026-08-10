@@ -2,6 +2,9 @@ package adfinir.game.ui;
 
 import adfinir.game.dungeon.DungeonMap;
 import adfinir.game.ecs.components.TransformComponent;
+import com.badlogic.ashley.core.ComponentMapper;
+import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 
@@ -13,6 +16,11 @@ public class MiniMap {
     private final float padding = 10f;
 
     public void draw(ShapeRenderer sr, DungeonMap map, TransformComponent playerTransform, float screenW, float screenH) {
+        draw(sr, map, playerTransform, screenW, screenH, null, null);
+    }
+
+    public void draw(ShapeRenderer sr, DungeonMap map, TransformComponent playerTransform, float screenW, float screenH,
+                      ImmutableArray<Entity> enemies, ComponentMapper<TransformComponent> transformMapper) {
         float mapWidth = map.getPixelWidth();
         float mapHeight = map.getPixelHeight();
 
@@ -45,11 +53,37 @@ public class MiniMap {
             }
         }
 
+        // Sortie du niveau (doré)
+        sr.setColor(Color.GOLD);
+        sr.rect(
+            offsetX + map.exitCol * DungeonMap.TILE_SIZE * scale,
+            offsetY + map.exitRow * DungeonMap.TILE_SIZE * scale,
+            DungeonMap.TILE_SIZE * scale,
+            DungeonMap.TILE_SIZE * scale
+        );
+
+        // Ennemis vivants (points rouges)
+        if (enemies != null && transformMapper != null) {
+            sr.setColor(Color.RED);
+            for (Entity enemy : enemies) {
+                TransformComponent t = transformMapper.get(enemy);
+                float ex = offsetX + t.x * scale;
+                float ey = offsetY + t.y * scale;
+                sr.rect(ex - 1.5f, ey - 1.5f, 3f, 3f);
+            }
+        }
+
         // Joueur
         sr.setColor(Color.BLUE);
         float playerX = offsetX + playerTransform.x * scale;
         float playerY = offsetY + playerTransform.y * scale;
         sr.rect(playerX - 2f, playerY - 2f, 4f, 4f);
+        sr.end();
+
+        // Bordure
+        sr.begin(ShapeRenderer.ShapeType.Line);
+        sr.setColor(Color.LIGHT_GRAY);
+        sr.rect(offsetX, offsetY, scaledW, scaledH);
         sr.end();
     }
 }

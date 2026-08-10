@@ -1,6 +1,7 @@
 package adfinir.game.ecs.systems;
 
 import adfinir.game.dungeon.DungeonMap;
+import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.EnemyAIComponent;
 import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
@@ -16,6 +17,7 @@ public class EnemyMovementSystem extends IteratingSystem {
     private final ComponentMapper<EnemyAIComponent> aiMapper = ComponentMapper.getFor(EnemyAIComponent.class);
     private final ComponentMapper<VelocityComponent> velMapper = ComponentMapper.getFor(VelocityComponent.class);
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper.getFor(TransformComponent.class);
+    private final ComponentMapper<CombatComponent> combatMapper = ComponentMapper.getFor(CombatComponent.class);
 
     private static final int MAX_RANDOM_TRIES = 8;
     // Distance de "sondage" devant l'ennemi pour valider la direction (en pixels)
@@ -44,13 +46,22 @@ public class EnemyMovementSystem extends IteratingSystem {
         float dy = playerPos.y - pos.y;
         float dist = (float) Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < ai.detectionRange) {
+        if (dist <= ai.attackRange) {
+            ai.state = EnemyAIComponent.State.ATTACKING;
+        } else if (dist < ai.detectionRange) {
             ai.state = EnemyAIComponent.State.PURSUING;
         } else if (dist > ai.detectionRange * 1.2f) {
             ai.state = EnemyAIComponent.State.IDLE;
         }
 
-        if (ai.state == EnemyAIComponent.State.PURSUING) {
+        if (ai.state == EnemyAIComponent.State.ATTACKING) {
+            vel.vx = 0;
+            vel.vy = 0;
+            CombatComponent combat = combatMapper.get(entity);
+            if (combat != null && combat.canAttack() && dist > 0f) {
+                combat.triggerAttack(dx / dist, dy / dist);
+            }
+        } else if (ai.state == EnemyAIComponent.State.PURSUING) {
             Vector2 nextStep = Pathfinding.findNextStep(map,
                 new Vector2(pos.x, pos.y),
                 new Vector2(playerPos.x, playerPos.y)

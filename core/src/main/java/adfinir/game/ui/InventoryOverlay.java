@@ -3,17 +3,28 @@ package adfinir.game.ui;
 import adfinir.game.inventory.*;
 import adfinir.game.ecs.components.InventoryComponent;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Disposable;
 
 /**
- * Overlay plein écran affichant l'inventaire et l'équipement du joueur.
+ * Overlay d'inventaire à onglets : ARME / ARMURE / SORT / ARTEFACT.
+ * Onglets cliquables (ou Tab / Shift+Tab au clavier), tooltip au survol d'un objet.
  */
 public class InventoryOverlay implements Disposable {
+
+    private enum Tab { ARME, ARMURE, SORT, ARTEFACT }
+
+    private static final Color BG          = new Color(0.06f, 0.06f, 0.09f, 0.93f);
+    private static final Color SLOT_BG     = new Color(0.14f, 0.14f, 0.19f, 1f);
+    private static final Color SLOT_BG_HOV = new Color(0.22f, 0.22f, 0.30f, 1f);
+    private static final Color TAB_BG      = new Color(0.10f, 0.10f, 0.14f, 1f);
+    private static final Color TAB_BG_SEL  = new Color(0.32f, 0.30f, 0.55f, 1f);
 
     private final SpriteBatch    batch;
     private final BitmapFont     font;
@@ -21,14 +32,17 @@ public class InventoryOverlay implements Disposable {
 
     private boolean visible = false;
     private InventoryComponent currentInventory;
+    private Tab currentTab = Tab.ARME;
 
     // Mise en page
     private static final float MARGIN     = 20f;
-    private static final float BOX_W      = 200f;
-    private static final float BOX_H      = 350f;
-    private static final float SLOT_W     = 160f;
-    private static final float SLOT_H     = 60f;
+    private static final float BOX_W      = 240f;
+    private static final float BOX_H      = 280f;
+    private static final float SLOT_W     = 200f;
+    private static final float SLOT_H     = 70f;
+    private static final float SMALL_SLOT = 92f;
     private static final float PADDING    = 15f;
+    private static final float TAB_H      = 26f;
 
     public InventoryOverlay() {
         batch  = new SpriteBatch();
@@ -45,109 +59,155 @@ public class InventoryOverlay implements Disposable {
 
     public void update(InventoryComponent inventory) {
         this.currentInventory = inventory;
+
+        // Navigation clavier : Tab (suivant) / Shift+Tab (précédent)
+        if (visible && Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
+            int dir = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) ? -1 : 1;
+            cycleTab(dir);
+        }
+    }
+
+    private void cycleTab(int dir) {
+        int next = (currentTab.ordinal() + dir + Tab.values().length) % Tab.values().length;
+        currentTab = Tab.values()[next];
     }
 
     public void draw() {
         if (!visible || currentInventory == null) return;
 
-        int screenW = Gdx.graphics.getWidth();
         int screenH = Gdx.graphics.getHeight();
-
-        // Positionné à gauche de l'écran
         float boxX = MARGIN;
         float boxY = (screenH - BOX_H) / 2f;
+        float mouseX = UiInput.mouseX();
+        float mouseY = UiInput.mouseY();
+        boolean clicked = Gdx.input.isButtonJustPressed(Input.Buttons.LEFT);
 
-        // 1. Render all shapes first
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(0f, 0f, 0f, 0.85f);
+        shapes.setColor(BG);
+        shapes.rect(boxX, boxY, BOX_W, BOX_H);
+        shapes.end();
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(Color.LIGHT_GRAY);
         shapes.rect(boxX, boxY, BOX_W, BOX_H);
         shapes.end();
 
-        shapes.begin(ShapeRenderer.ShapeType.Line);
-        shapes.setColor(Color.GRAY);
+        drawTabHeader(boxX, boxY, mouseX, mouseY, clicked);
 
-        float currentY = boxY + BOX_H - PADDING - 60f;
+        Item hoveredItem = null;
+        switch (currentTab) {
+            case ARME:     hoveredItem = drawSingleSlot(boxX, boxY, "Arme", currentInventory.weapon, mouseX, mouseY); break;
+            case ARMURE:   hoveredItem = drawSingleSlot(boxX, boxY, "Armure", currentInventory.armor, mouseX, mouseY); break;
+            case ARTEFACT: hoveredItem = drawSingleSlot(boxX, boxY, "Artéfact", currentInventory.artifact, mouseX, mouseY); break;
+            case SORT:     hoveredItem = drawSpellGrid(boxX, boxY, mouseX, mouseY); break;
+        }
 
-        // Slots alignés verticalement (un en dessous de l'autre)
-        shapes.rect(boxX + PADDING, currentY, SLOT_W, SLOT_H);
-        currentY -= SLOT_H + PADDING;
-        shapes.rect(boxX + PADDING, currentY, SLOT_W, SLOT_H);
-        currentY -= SLOT_H + PADDING;
-        shapes.rect(boxX + PADDING, currentY, SLOT_W, SLOT_H);
-        currentY -= SLOT_H + PADDING;
-        shapes.rect(boxX + PADDING, currentY, SLOT_W, SLOT_H);
+        batch.begin();
+        font.setColor(Color.LIGHT_GRAY);
+        font.draw(batch, "[Tab] onglet    [E] fermer", boxX + PADDING, boxY + PADDING + 5f);
+        batch.end();
+
+        if (hoveredItem != null) {
+            Tooltip.draw(shapes, batch, font, mouseX, mouseY, hoveredItem.name + " (" + hoveredItem.rarity.name() + ")");
+        }
+    }
+
+    /** Dessine les 4 boutons d'onglets, gère le clic. Retourne rien : cliquer change directement currentTab. */
+    private void drawTabHeader(float boxX, float boxY, float mouseX, float mouseY, boolean clicked) {
+        Tab[] tabs = Tab.values();
+        float tabW = (BOX_W - PADDING * 2) / tabs.length;
+        float tabY = boxY + BOX_H - PADDING - TAB_H;
+
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for (int i = 0; i < tabs.length; i++) {
+            float tx = boxX + PADDING + i * tabW;
+            Rectangle rect = new Rectangle(tx, tabY, tabW - 3f, TAB_H);
+            boolean hovered = rect.contains(mouseX, mouseY);
+            shapes.setColor(tabs[i] == currentTab ? TAB_BG_SEL : (hovered ? SLOT_BG_HOV : TAB_BG));
+            shapes.rect(rect.x, rect.y, rect.width, rect.height);
+            if (hovered && clicked) currentTab = tabs[i];
+        }
         shapes.end();
 
-        // 2. Render all sprites and text second
         batch.begin();
-
-        float textY = boxY + BOX_H - PADDING - 20f;
-        font.setColor(Color.YELLOW);
-        font.draw(batch, "--- INVENTAIRE ---", boxX + PADDING, textY);
-
-        float slotY = boxY + BOX_H - PADDING - 60f;
-
-        drawSlotContent(batch, font, boxX + PADDING, slotY, "Arme", currentInventory.weapon);
-        slotY -= SLOT_H + PADDING;
-        drawSlotContent(batch, font, boxX + PADDING, slotY, "Capacité", currentInventory.capacity);
-        slotY -= SLOT_H + PADDING;
-        drawSlotContent(batch, font, boxX + PADDING, slotY, "Armure", currentInventory.armor);
-        slotY -= SLOT_H + PADDING;
-        drawSlotContent(batch, font, boxX + PADDING, slotY, "Artéfact", currentInventory.artifact);
-
-        float footerY = boxY + PADDING + 20f;
-        font.setColor(Color.LIGHT_GRAY);
-        font.draw(batch, "[E] fermer l'inventaire", boxX + PADDING, footerY);
-
+        for (int i = 0; i < tabs.length; i++) {
+            float tx = boxX + PADDING + i * tabW;
+            font.setColor(tabs[i] == currentTab ? Color.YELLOW : Color.LIGHT_GRAY);
+            font.draw(batch, tabs[i].name(), tx + 4f, tabY + 17f);
+        }
         batch.end();
     }
 
-    private void drawSlotContent(SpriteBatch batch, BitmapFont font, float x, float y, String label, Item item) {
-        // Label
-        font.setColor(Color.LIGHT_GRAY);
-        font.draw(batch, label, x + 5, y + SLOT_H - 5);
-
-        if (item != null) {
-            // Draw sprite if it's a weapon
-            if (item instanceof Weapon) {
-                com.badlogic.gdx.graphics.g2d.TextureRegion region = WeaponSpriteManager.getRegion(((Weapon) item).type);
-
-                // Scale the sprite to fit nicely in the slot (max 40x40)
-                float w = region.getRegionWidth();
-                float h = region.getRegionHeight();
-                float scale = Math.min(40f / w, 40f / h);
-                float finalW = w * scale;
-                float finalH = h * scale;
-
-                batch.draw(region, x + (SLOT_W - finalW) / 2f, y + (SLOT_H - finalH) / 2f, finalW, finalH);
-            }
-
-            // Name and Rarity
-            font.setColor(getRarityColor(item.rarity));
-            font.draw(batch, item.name, x + 5, y + SLOT_H - 20);
-
-            // Short description
-            font.setColor(Color.WHITE);
-            String desc = item.getDescription();
-            if (desc.length() > 25) desc = desc.substring(0, 22) + "...";
-            font.draw(batch, desc, x + 5, y + SLOT_H - 35);
-        } else {
-            font.setColor(Color.DARK_GRAY);
-            font.draw(batch, "Vide", x + 5, y + SLOT_H - 20);
-        }
+    private Item drawSingleSlot(float boxX, float boxY, String label, Item item, float mouseX, float mouseY) {
+        float slotX = boxX + (BOX_W - SLOT_W) / 2f;
+        float slotY = boxY + BOX_H - PADDING - TAB_H - 15f - SLOT_H;
+        return drawSlot(slotX, slotY, SLOT_W, SLOT_H, label, item, mouseX, mouseY);
     }
 
-    private Color getRarityColor(Rarity rarity) {
-        switch (rarity) {
-            case LEGENDARY: return Color.ORANGE;
-            case EPIC:      return Color.PURPLE;
-            case RARE:      return Color.CYAN;
-            case COMMON:   return Color.WHITE;
-            default:        return Color.WHITE;
+    /** Onglet SORT : grille 2x2 des 4 sorts équipés (touches 1-4 dans la hotbar). */
+    private Item drawSpellGrid(float boxX, float boxY, float mouseX, float mouseY) {
+        float gap = 10f;
+        float slotW = (BOX_W - PADDING * 2 - gap) / 2f;
+        float top = boxY + BOX_H - PADDING - TAB_H - 15f;
+
+        Item hovered = null;
+        for (int i = 0; i < InventoryComponent.SPELL_SLOTS; i++) {
+            float col = i % 2;
+            float row = i / 2;
+            float sx = boxX + PADDING + col * (slotW + gap);
+            float sy = top - SMALL_SLOT - row * (SMALL_SLOT + gap);
+            Item found = drawSlot(sx, sy, slotW, SMALL_SLOT, (i + 1) + ". Sort", currentInventory.spells[i], mouseX, mouseY);
+            if (found != null) hovered = found;
         }
+        return hovered;
+    }
+
+    /** Dessine un slot (fond + bordure de rareté + icône + texte) et retourne l'item si survolé. */
+    private Item drawSlot(float x, float y, float w, float h, String label, Item item, float mouseX, float mouseY) {
+        Rectangle rect = new Rectangle(x, y, w, h);
+        boolean hovered = rect.contains(mouseX, mouseY);
+
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(hovered ? SLOT_BG_HOV : SLOT_BG);
+        shapes.rect(x, y, w, h);
+        if (item != null) {
+            ItemIcon.draw(shapes, item, x, y + 10f, w, h - 10f);
+        }
+        shapes.end();
+
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(slotBorderColor(item));
+        shapes.rect(x, y, w, h);
+        shapes.end();
+
+        batch.begin();
+        font.setColor(Color.GRAY);
+        font.draw(batch, label, x + 5, y + h - 5);
+
+        if (item instanceof Weapon) {
+            com.badlogic.gdx.graphics.g2d.TextureRegion region = WeaponSpriteManager.getRegion(((Weapon) item).type);
+            float rw = region.getRegionWidth();
+            float rh = region.getRegionHeight();
+            float scale = Math.min(30f / rw, 30f / rh);
+            batch.draw(region, x + (w - rw * scale) / 2f, y + (h - rh * scale) / 2f + 5f, rw * scale, rh * scale);
+        }
+
+        if (item != null) {
+            font.setColor(RarityColors.get(item.rarity));
+            font.draw(batch, item.name, x + 5, y + h - 18);
+        } else {
+            font.setColor(Color.DARK_GRAY);
+            font.draw(batch, "Vide", x + 5, y + h - 18);
+        }
+        batch.end();
+
+        return (hovered && item != null) ? item : null;
+    }
+
+    private Color slotBorderColor(Item item) {
+        return item == null ? Color.DARK_GRAY : RarityColors.get(item.rarity);
     }
 
     public void resize(int w, int h) {

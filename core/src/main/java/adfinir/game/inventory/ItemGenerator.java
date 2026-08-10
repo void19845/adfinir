@@ -41,10 +41,22 @@ public class ItemGenerator {
         return createWeaponOfType(type, Rarity.COMMON);
     }
 
+    /** Sorts disponibles : nom, dégâts de base, vitesse, rayon, élément. */
+    private static final Object[][] SPELL_PRESETS = {
+        {"Boule de Feu",    15f, 300f, 50f, "FIRE"},
+        {"Éclat de Glace",  12f, 260f, 40f, "ICE"},
+        {"Foudre",          20f, 420f, 35f, "ELECTRIC"},
+        {"Nuage Toxique",    8f, 150f, 70f, "POISON"},
+        {"Onde de Choc",    18f, 200f, 60f, "PHYSICAL"},
+        {"Lame de Vent",    14f, 500f, 30f, "WIND"},
+    };
+
     public static Capacity generateCapacity() {
         Rarity rarity = getRandomRarity();
-        CapacityEffect base = new CapacityEffect("Boule de Feu", 15f, 300f, 50f, "FIRE");
-        Capacity cap = new Capacity("Sceptre Arcanique", rarity, base);
+        Object[] preset = SPELL_PRESETS[rand.nextInt(SPELL_PRESETS.length)];
+        String name = (String) preset[0];
+        CapacityEffect base = new CapacityEffect(name, (float) preset[1], (float) preset[2], (float) preset[3], (String) preset[4]);
+        Capacity cap = new Capacity(name, rarity, base);
 
         // Ajouter des modificateurs selon la rareté
         int modCount = rarity.bonusPropertyCount;
@@ -68,6 +80,11 @@ public class ItemGenerator {
         return new Artifact("Relique Ancienne", rarity, "SYNERGIE_SANG", (obj) -> {
             // Logique de l'effet passif
         });
+    }
+
+    /** Prix boutique d'un objet selon sa rareté. */
+    public static int priceFor(Rarity rarity) {
+        return Math.round(30 * rarity.statMultiplier);
     }
 
     private static Rarity getRandomRarity() {

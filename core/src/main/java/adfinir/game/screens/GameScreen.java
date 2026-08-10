@@ -21,13 +21,19 @@ import adfinir.game.ecs.systems.RenderSystem;
 import adfinir.game.ecs.systems.StatsSystem;
 import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.ecs.components.InventoryComponent;
+import adfinir.game.ecs.components.LootComponent;
 import adfinir.game.inventory.Weapon;
 
 import adfinir.game.ui.MiniMap;
+import adfinir.game.ui.HotbarOverlay;
 import adfinir.game.ui.InventoryOverlay;
+import adfinir.game.ui.ShopOverlay;
 import adfinir.game.ui.StatsOverlay;
+import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
+import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
@@ -62,10 +68,16 @@ public class GameScreen implements Screen {
 
     private StatsOverlay statsOverlay;
     private InventoryOverlay inventoryOverlay;
+    private HotbarOverlay hotbarOverlay;
+    private ShopOverlay shopOverlay;
     private MiniMap      miniMap;
     private OrthographicCamera uiCamera;
     private int screenW, screenH;
     private int currentLevel = 1;
+
+    private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper.getFor(TransformComponent.class);
+    private Family enemyFamily;
+    private Family lootFamily;
 
     public GameScreen(Main game) {
         this.game = game;
@@ -85,11 +97,12 @@ public class GameScreen implements Screen {
         dungeonMap      = generator.generate();
         dungeonRenderer = new DungeonRenderer(dungeonMap);
 
+        enemyFamily = Family.all(EnemyStatsComponent.class, TransformComponent.class).get();
+
+        lootFamily = Family.all(LootComponent.class, TransformComponent.class).get();
+
         engine = new Engine();
-        engine.addSystem(new DeathSystem());
         engine.addSystem(new StatsSystem());
-        engine.addSystem(new CombatSystem());
-        engine.addSystem(new PlayerInputSystem());
         engine.addSystem(new MovementSystem(dungeonMap));
         engine.addSystem(new RenderSystem(shapeRenderer));
 
@@ -113,7 +126,7 @@ public class GameScreen implements Screen {
         InventoryComponent inventory = new InventoryComponent();
         inventory.equipWeapon(ItemGenerator.generateWeapon());
         inventory.equipArmor(ItemGenerator.generateArmor());
-        inventory.equipCapacity(ItemGenerator.generateCapacity());
+        inventory.equipSpell(0, ItemGenerator.generateCapacity());
         inventory.equipArtifact(ItemGenerator.generateArtifact());
 
         // Synchronise les stats de départ avec l'équipement généré
@@ -130,8 +143,11 @@ public class GameScreen implements Screen {
         player.add(inventory);
         engine.addEntity(player);
 
-        // MAINTENANT on ajoute le système de mouvement ennemi avec le joueur initialisé
+        // MAINTENANT on ajoute les systèmes qui dépendent du joueur/des familles
         engine.addSystem(new EnemyMovementSystem(dungeonMap, player));
+        engine.addSystem(new CombatSystem(player, enemyFamily));
+        engine.addSystem(new PlayerInputSystem(enemyFamily, lootFamily));
+        engine.addSystem(new DeathSystem(player));
 
         // Ajout de quelques ennemis fixes dans des zones accessibles
         for (int i = 0; i < 5; i++) {
@@ -141,8 +157,42 @@ public class GameScreen implements Screen {
 
         statsOverlay = new StatsOverlay();
         inventoryOverlay = new InventoryOverlay();
+        hotbarOverlay = new HotbarOverlay();
+        shopOverlay = new ShopOverlay();
         miniMap      = new MiniMap();
         uiCamera     = new OrthographicCamera();
+    }
+
+    /** Régénère un nouveau donjon (plus difficile) quand le joueur atteint la sortie. */
+    private void loadNextLevel() {
+        currentLevel++;
+
+        DungeonGenerator generator = new DungeonGenerator(50, 40);
+        dungeonMap      = generator.generate();
+        dungeonRenderer = new DungeonRenderer(dungeonMap);
+
+        // Retire les ennemis de l'ancien niveau
+        ImmutableArray<Entity> oldEnemies = engine.getEntitiesFor(enemyFamily);
+        for (int i = oldEnemies.size() - 1; i >= 0; i--) {
+            engine.removeEntity(oldEnemies.get(i));
+        }
+
+        // MovementSystem et EnemyMovementSystem référencent la carte en dur : on les recrée
+        engine.removeSystem(engine.getSystem(MovementSystem.class));
+        engine.removeSystem(engine.getSystem(EnemyMovementSystem.class));
+        engine.addSystem(new MovementSystem(dungeonMap));
+        engine.addSystem(new EnemyMovementSystem(dungeonMap, player));
+
+        // Replace le joueur au nouveau spawn (stats/équipement conservés)
+        playerTransform.x = dungeonMap.getSpawnPixelX();
+        playerTransform.y = dungeonMap.getSpawnPixelY();
+
+        for (int i = 0; i < 5; i++) {
+            com.badlogic.gdx.math.Vector2 pos = dungeonMap.getRandomFloorPosition();
+            spawnEnemy(pos.x, pos.y);
+        }
+
+        Gdx.app.log("GameScreen", "Niveau " + currentLevel + " chargé.");
     }
 
     private void spawnEnemy(float x, float y) {
@@ -168,6 +218,7 @@ public class GameScreen implements Screen {
         ai.detectionRange = com.badlogic.gdx.math.MathUtils.random(80f, 150f);
 
         CombatComponent combat = new CombatComponent();
+        adfinir.game.enemy.EnemyGenerator.configureEnemy(stats, combat, ai, currentLevel);
 
         enemy.add(transform);
         enemy.add(vel);
@@ -192,14 +243,35 @@ public class GameScreen implements Screen {
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             inventoryOverlay.toggle();
         }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+            shopOverlay.toggle();
+        }
 
-        if (!inventoryOverlay.isVisible()) {
+        if (shopOverlay.isVisible()) {
+            InventoryComponent inv = player.getComponent(InventoryComponent.class);
+            CombatComponent combat = player.getComponent(CombatComponent.class);
+            shopOverlay.update(delta, inv, playerStats, combat);
+        }
+
+        if (!inventoryOverlay.isVisible() && !shopOverlay.isVisible()) {
             engine.getSystem(StatsSystem.class).update(delta);
             engine.getSystem(CombatSystem.class).update(delta);
             engine.getSystem(PlayerInputSystem.class).update(delta);
             engine.getSystem(EnemyMovementSystem.class).update(delta);
             engine.getSystem(MovementSystem.class).update(delta);
             engine.getSystem(DeathSystem.class).update(delta);
+
+            if (playerStats.isDead) {
+                game.setScreen(new GameOverScreen(game, currentLevel));
+                dispose();
+                return;
+            }
+
+            int playerCol = (int) (playerTransform.x / DungeonMap.TILE_SIZE);
+            int playerRow = (int) (playerTransform.y / DungeonMap.TILE_SIZE);
+            if (playerCol == dungeonMap.exitCol && playerRow == dungeonMap.exitRow) {
+                loadNextLevel();
+            }
         }
 
         // Clamp caméra en tenant compte de la vue étendue
@@ -235,10 +307,17 @@ public class GameScreen implements Screen {
         inventoryOverlay.draw();
 
         shapeRenderer.setProjectionMatrix(uiCamera.combined);
-        miniMap.draw(shapeRenderer, dungeonMap, playerTransform, screenW, screenH);
+        ImmutableArray<Entity> enemies = engine.getEntitiesFor(enemyFamily);
+        miniMap.draw(shapeRenderer, dungeonMap, playerTransform, screenW, screenH, enemies, transformMapper);
 
-        statsOverlay.update(playerStats, delta);
+        statsOverlay.update(playerStats, delta, currentLevel);
         statsOverlay.draw();
+
+        hotbarOverlay.update(player.getComponent(InventoryComponent.class), player.getComponent(CombatComponent.class));
+        hotbarOverlay.draw(screenW);
+
+        shopOverlay.draw(screenW, screenH, player.getComponent(InventoryComponent.class), playerStats,
+            player.getComponent(CombatComponent.class));
     }
 
     @Override
@@ -248,6 +327,8 @@ public class GameScreen implements Screen {
         viewport.update(w, h, true);
         statsOverlay.resize(w, h);
         inventoryOverlay.resize(w, h);
+        hotbarOverlay.resize(w, h);
+        shopOverlay.resize(w, h);
         uiCamera.viewportWidth = w;
         uiCamera.viewportHeight = h;
         uiCamera.position.set(w / 2f, h / 2f, 0);
@@ -263,5 +344,7 @@ public class GameScreen implements Screen {
         shapeRenderer.dispose();
         statsOverlay.dispose();
         inventoryOverlay.dispose();
+        hotbarOverlay.dispose();
+        shopOverlay.dispose();
     }
 }
