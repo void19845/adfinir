@@ -507,12 +507,14 @@ public class GameScreen implements Screen {
 
         lootBarOverlay.draw();
 
+        statsOverlay.update(playerStats, delta);
+        statsOverlay.drawHud(screenW);
+
         shopOverlay.draw(screenW, screenH, player.getComponent(LootBarComponent.class), playerStats);
 
         shapeRenderer.setProjectionMatrix(uiCamera.combined);
         miniMap.draw(shapeRenderer, dungeonMap, playerTransform, screenW, screenH);
 
-        statsOverlay.update(playerStats, delta);
         statsOverlay.draw();
 
         drawScreenOverlays();

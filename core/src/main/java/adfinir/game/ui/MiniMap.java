@@ -25,13 +25,16 @@ public class MiniMap {
         float offsetX = screenW - scaledW - padding;
         float offsetY = screenH - scaledH - padding;
 
-        // Fond de la mini-map
+        float pad = 4f;
+
+        // Panneau en relief autour de la carte + fond ardoise de la carte elle-même
         sr.begin(ShapeRenderer.ShapeType.Filled);
-        sr.setColor(0f, 0f, 0f, 0.5f);
+        UiTheme.panel(sr, offsetX - pad, offsetY - pad, scaledW + pad * 2, scaledH + pad * 2);
+        sr.setColor(0.03f, 0.03f, 0.05f, 0.9f);
         sr.rect(offsetX, offsetY, scaledW, scaledH);
 
         // Dessin des murs
-        sr.setColor(0.5f, 0.5f, 0.5f, 1f);
+        sr.setColor(0.42f, 0.44f, 0.5f, 1f);
         for (int r = 0; r < map.rows; r++) {
             for (int c = 0; c < map.cols; c++) {
                 if (map.getTile(c, r) == DungeonMap.TILE_WALL) {
@@ -46,7 +49,7 @@ public class MiniMap {
         }
 
         // Joueur
-        sr.setColor(Color.BLUE);
+        sr.setColor(new Color(0.4f, 0.75f, 1f, 1f));
         float playerX = offsetX + playerTransform.x * scale;
         float playerY = offsetY + playerTransform.y * scale;
         sr.rect(playerX - 2f, playerY - 2f, 4f, 4f);

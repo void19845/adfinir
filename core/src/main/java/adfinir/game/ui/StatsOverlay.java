@@ -7,12 +7,18 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Disposable;
 
 /**
- * Overlay stats dessiné directement en coordonnées écran.
- * Pas de Scene2D — SpriteBatch + BitmapFont natif libGDX.
- * Taille toujours cohérente quelle que soit la résolution.
+ * HUD de stats du joueur, en deux parties :
+ *  - drawHud() : barres PV/Stamina + or, toujours affichées, ancrées juste
+ *    au-dessus de la hotbar (LootBarOverlay) pour former un même cluster
+ *    "bas d'écran" façon Minecraft — mais sobre (barres pleines, pas de cœurs).
+ *  - draw()    : panneau détaillé (ATK/MAG/DEF/SPD...), replié par défaut,
+ *    bascule avec [K].
+ * Pas de Scene2D — SpriteBatch + BitmapFont natif libGDX, taille cohérente
+ * quelle que soit la résolution.
  */
 public class StatsOverlay implements Disposable {
 
@@ -22,20 +28,20 @@ public class StatsOverlay implements Disposable {
 
     private boolean visible = false;
 
-    // Mise en page
+    // Mise en page — panneau détaillé [K]
     private static final float MARGIN     = 12f;
     private static final float LINE_H     = 20f;
-    private static final float PAD        = 8f;
-    private static final float COL_VAL_X  = 90f; // décalage colonne valeur
+    private static final float PAD        = 10f;
+    private static final float COL_VAL_X  = 92f; // décalage colonne valeur
 
-    // Contenu courant (mis à jour chaque frame)
-    private String hp       = "—";
-    private String stamina  = "—";
-    private String atk      = "—";
-    private String mag      = "—";
-    private String def      = "—";
-    private String spd      = "—";
-    private String gold     = "—";
+    // Mise en page — barres HUD persistantes
+    private static final float BAR_H       = 16f;
+    private static final float BAR_GAP     = 5f;
+    private static final float HUD_MARGIN  = 6f; // espace entre la hotbar et les barres
+
+    // Contenu courant (recalculé chaque frame)
+    private float hpCur, hpMax, stCur, stMax;
+    private String atk = "—", mag = "—", def = "—", spd = "—", gold = "—";
 
     public StatsOverlay() {
         batch  = new SpriteBatch();
@@ -51,75 +57,113 @@ public class StatsOverlay implements Disposable {
     public boolean isVisible() { return visible; }
 
     public void update(PlayerStatsComponent stats, float delta) {
-        if (!visible) return;
-        hp      = String.format("%.0f / %.0f", stats.currentHp,      stats.maxHp());
-        stamina = String.format("%.0f / %.0f", stats.currentStamina, stats.maxStamina());
-        atk     = String.format("%.0f",        stats.atk());
-        mag     = String.format("%.0f",        stats.mag());
-        def     = String.format("%.0f",        stats.def());
-        spd     = String.format("%.0f px/s",   stats.spd());
-        gold    = String.valueOf(stats.gold);
+        hpCur = stats.currentHp;
+        hpMax = stats.stats.maxHp();
+        stCur = stats.currentStamina;
+        stMax = stats.stats.maxStamina();
+        atk   = String.format("%.0f",      stats.atk());
+        mag   = String.format("%.0f",      stats.mag());
+        def   = String.format("%.0f",      stats.def());
+        spd   = String.format("%.0f px/s", stats.spd());
+        gold  = String.valueOf(stats.gold);
     }
+
+    // ------------------------------------------------------------------
+    // HUD persistant (PV / Stamina / Or) — toujours visible
+    // ------------------------------------------------------------------
+
+    public void drawHud(int screenW) {
+        float barW = (LootBarOverlay.totalWidth() - BAR_GAP) / 2f;
+        float startX = LootBarOverlay.startX(screenW);
+        float y = LootBarOverlay.topY() + HUD_MARGIN;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        UiTheme.slotSunken(shapes, startX, y, barW, BAR_H, UiTheme.SLOT_BG_EMPTY);
+        UiTheme.slotSunken(shapes, startX + barW + BAR_GAP, y, barW, BAR_H, UiTheme.SLOT_BG_EMPTY);
+        drawBarFill(startX, y, barW, hpMax > 0 ? hpCur / hpMax : 0f, new Color(0.78f, 0.16f, 0.18f, 1f));
+        drawBarFill(startX + barW + BAR_GAP, y, barW, stMax > 0 ? stCur / stMax : 0f, new Color(0.75f, 0.62f, 0.15f, 1f));
+        shapes.end();
+
+        // Badge Or, centré au-dessus des deux barres
+        float goldY = y + BAR_H + BAR_GAP;
+        float goldW = 70f;
+        float goldX = startX + (LootBarOverlay.totalWidth() - goldW) / 2f;
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        UiTheme.slotSunken(shapes, goldX, goldY, goldW, BAR_H, UiTheme.SLOT_BG_EMPTY);
+        shapes.end();
+
+        batch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(batch, String.format("%.0f / %.0f", hpCur, hpMax), startX, y + BAR_H - 3f, barW, Align.center, false);
+        font.draw(batch, String.format("%.0f / %.0f", stCur, stMax), startX + barW + BAR_GAP, y + BAR_H - 3f, barW, Align.center, false);
+        font.setColor(new Color(1f, 0.86f, 0.35f, 1f));
+        font.draw(batch, gold + " or", goldX, goldY + BAR_H - 3f, goldW, Align.center, false);
+        batch.end();
+    }
+
+    /** Remplissage proportionnel d'une barre, inséré à l'intérieur du bevel en creux (pas par-dessus). */
+    private void drawBarFill(float x, float y, float w, float ratio, Color color) {
+        float inset = UiTheme.BEVEL;
+        float fillW = Math.max(0f, (w - inset * 2) * Math.min(1f, Math.max(0f, ratio)));
+        shapes.setColor(color);
+        shapes.rect(x + inset, y + inset, fillW, BAR_H - inset * 2);
+    }
+
+    // ------------------------------------------------------------------
+    // Panneau détaillé — [K]
+    // ------------------------------------------------------------------
 
     public void draw() {
         if (!visible) return;
 
         int screenH = Gdx.graphics.getHeight();
 
-        // Lignes : titre + 7 stats + hint = 9 lignes
-        int lines   = 9;
-        float boxW  = 200f;
+        // Lignes : titre + 6 stats (ATK/MAG/DEF/SPD/PV/Stamina) + hint = 8 lignes
+        int lines   = 8;
+        float boxW  = 210f;
         float boxH  = PAD * 2 + lines * LINE_H;
         float boxX  = MARGIN;
         float boxY  = screenH - MARGIN - boxH;
 
-        // Fond semi-transparent
-        // Correction : On s'assure que le blending est activé pour la transparence
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(0f, 0f, 0f, 0.72f);
-        shapes.rect(boxX, boxY, boxW, boxH);
+        UiTheme.panel(shapes, boxX, boxY, boxW, boxH);
         shapes.end();
 
-        // Le blending doit être désactivé si d'autres éléments du jeu ne l'utilisent pas,
-        // mais libGDX SpriteBatch l'active généralement.
-        // Pour éviter les bugs de rendu, on peut laisser activé ou gérer finement.
-        // Gdx.gl.glDisable(GL20.GL_BLEND);
-
-        // Texte
         batch.begin();
 
         float x    = boxX + PAD;
         float xVal = boxX + PAD + COL_VAL_X;
         float y    = boxY + boxH - PAD - LINE_H * 0.25f; // libGDX : y = baseline
 
-        font.setColor(Color.YELLOW);
-        font.draw(batch, "-- STATS --", x, y);
+        font.setColor(UiTheme.TEXT_TITLE);
+        font.draw(batch, "STATISTIQUES", x, y);
         y -= LINE_H;
 
-        drawRow(batch, font, x, xVal, y, "PV",      hp,      Color.GREEN);      y -= LINE_H;
-        drawRow(batch, font, x, xVal, y, "Stamina", stamina, Color.YELLOW);     y -= LINE_H;
-        drawRow(batch, font, x, xVal, y, "ATK",     atk,     Color.ORANGE);     y -= LINE_H;
-        drawRow(batch, font, x, xVal, y, "MAG",     mag,     Color.CYAN);       y -= LINE_H;
-        drawRow(batch, font, x, xVal, y, "DEF",     def,     Color.LIGHT_GRAY); y -= LINE_H;
-        drawRow(batch, font, x, xVal, y, "SPD",     spd,     Color.WHITE);      y -= LINE_H;
-        drawRow(batch, font, x, xVal, y, "Or",      gold,    Color.GOLD);       y -= LINE_H;
+        drawRow(x, xVal, y, "PV",      String.format("%.0f / %.0f", hpCur, hpMax), new Color(0.85f, 0.3f, 0.3f, 1f)); y -= LINE_H;
+        drawRow(x, xVal, y, "Stamina", String.format("%.0f / %.0f", stCur, stMax), new Color(0.85f, 0.75f, 0.3f, 1f)); y -= LINE_H;
+        drawRow(x, xVal, y, "ATK",     atk,     Color.ORANGE);      y -= LINE_H;
+        drawRow(x, xVal, y, "MAG",     mag,     Color.CYAN);        y -= LINE_H;
+        drawRow(x, xVal, y, "DEF",     def,     UiTheme.TEXT_BODY); y -= LINE_H;
+        drawRow(x, xVal, y, "SPD",     spd,     Color.WHITE);       y -= LINE_H;
+        drawRow(x, xVal, y, "Or",      gold,    new Color(1f, 0.86f, 0.35f, 1f)); y -= LINE_H;
 
-        font.setColor(0.5f, 0.5f, 0.5f, 1f);
+        font.setColor(UiTheme.TEXT_DIM);
         font.draw(batch, "[K] fermer", x, y);
 
         batch.end();
     }
 
-    private void drawRow(SpriteBatch b, BitmapFont f,
-                         float xLabel, float xVal, float y,
-                         String label, String value, Color valueColor) {
-        f.setColor(Color.LIGHT_GRAY);
-        f.draw(b, label, xLabel, y);
-        f.setColor(valueColor);
-        f.draw(b, value, xVal, y);
+    private void drawRow(float xLabel, float xVal, float y, String label, String value, Color valueColor) {
+        font.setColor(UiTheme.TEXT_DIM);
+        font.draw(batch, label, xLabel, y);
+        font.setColor(valueColor);
+        font.draw(batch, value, xVal, y);
     }
 
     public void resize(int w, int h) {
