@@ -8,6 +8,7 @@ import adfinir.game.ecs.components.CapacityComponent;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.DashComponent;
 import adfinir.game.ecs.components.EnemyAIComponent;
+import adfinir.game.ecs.components.EnemyProjectileComponent;
 import adfinir.game.ecs.components.EnemyStatsComponent;
 import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.LootComponent;
@@ -23,6 +24,7 @@ import adfinir.game.ecs.systems.DashSystem;
 import adfinir.game.ecs.systems.DeathSystem;
 import adfinir.game.ecs.systems.EnemyAttackSystem;
 import adfinir.game.ecs.systems.EnemyMovementSystem;
+import adfinir.game.ecs.systems.EnemyProjectileSystem;
 import adfinir.game.ecs.systems.LootPickupSystem;
 import adfinir.game.ecs.systems.MovementSystem;
 import adfinir.game.ecs.systems.PlayerInputSystem;
@@ -35,6 +37,7 @@ import adfinir.game.inventory.Weapon;
 
 import adfinir.game.save.SaveData;
 import adfinir.game.save.SaveManager;
+import adfinir.game.enemy.EnemyType;
 import adfinir.game.input.GameAction;
 import adfinir.game.input.KeyBindings;
 import adfinir.game.ui.MiniMap;
@@ -266,6 +269,7 @@ public class GameScreen implements Screen {
         // Systèmes dépendants de la carte / des entités de l'étage : toujours reconstruits
         replaceSystem(EnemyMovementSystem.class, new EnemyMovementSystem(dungeonMap, player));
         replaceSystem(EnemyAttackSystem.class, new EnemyAttackSystem(player));
+        replaceSystem(EnemyProjectileSystem.class, new EnemyProjectileSystem(dungeonMap, player));
         replaceSystem(LootPickupSystem.class,
             new LootPickupSystem(player, player.getComponent(LootBarComponent.class)));
 
@@ -285,7 +289,8 @@ public class GameScreen implements Screen {
     /** Retire les ennemis et objets de loot restants de l'étage précédent. */
     private void clearFloorEntities() {
         Array<Entity> toRemove = new Array<>();
-        for (Entity e : engine.getEntitiesFor(Family.one(EnemyStatsComponent.class, LootComponent.class, ProjectileComponent.class).get())) {
+        for (Entity e : engine.getEntitiesFor(Family.one(EnemyStatsComponent.class, LootComponent.class,
+                ProjectileComponent.class, EnemyProjectileComponent.class).get())) {
             toRemove.add(e);
         }
         for (Entity e : toRemove) {
@@ -293,16 +298,22 @@ public class GameScreen implements Screen {
         }
     }
 
+    /** Distance minimale (px) entre le spawn du joueur et un ennemi généré sur l'étage. */
+    private static final float ENEMY_SPAWN_SAFE_DISTANCE = 130f;
+
     private void spawnEnemiesForFloor(float threatFactor) {
         int enemyCount = 5 + (currentLevel - 1); // un peu plus d'ennemis par étage
         for (int i = 0; i < enemyCount; i++) {
-            com.badlogic.gdx.math.Vector2 pos = dungeonMap.getRandomFloorPosition();
+            com.badlogic.gdx.math.Vector2 pos = dungeonMap.getRandomFloorPosition(ENEMY_SPAWN_SAFE_DISTANCE);
             spawnEnemy(pos.x, pos.y, threatFactor);
         }
     }
 
+    private static final EnemyType[] ENEMY_TYPES = EnemyType.values();
+
     private void spawnEnemy(float x, float y, float threatFactor) {
         Entity enemy = new Entity();
+        EnemyType type = ENEMY_TYPES[MathUtils.random(ENEMY_TYPES.length - 1)];
 
         TransformComponent transform = new TransformComponent();
         transform.x = x;
@@ -311,19 +322,31 @@ public class GameScreen implements Screen {
         VelocityComponent vel = new VelocityComponent();
 
         RenderComponent render = new RenderComponent();
-        render.color = new Color(1.0f, 0.2f, 0.2f, 1f); // Rouge pour les ennemis
-        render.width = 12f;
-        render.height = 12f;
+        render.color = type.color;
+        render.width = type.size;
+        render.height = type.size;
 
         EnemyStatsComponent stats = new EnemyStatsComponent();
         stats.applyThreatFactor(threatFactor); // HP / DEF / dégâts d'attaque montent avec l'étage
+        stats.maxHp *= type.hpMult;
+        stats.currentHp = stats.maxHp;
+        stats.def *= type.defMult;
+        stats.attackDamage *= type.damageMult;
+        stats.ranged = type.ranged;
+        if (type.ranged) {
+            stats.attackRange = 150f;   // portée de tir, bien plus grande que le contact
+            stats.attackCooldown = 1.6f;
+        }
 
         EnemyAIComponent ai = new EnemyAIComponent();
 
-        // Vitesse random mais mise à l'échelle par le threatFactor, bornée pour rester jouable
-        ai.speed = com.badlogic.gdx.math.MathUtils.random(20f, 50f) * threatFactor;
-        ai.pursuitSpeed = Math.min(ai.speed * 1.2f, 140f);
-        ai.detectionRange = com.badlogic.gdx.math.MathUtils.random(80f, 150f);
+        // Vitesse random mais mise à l'échelle par le threatFactor et le type, bornée pour rester jouable
+        ai.speed = MathUtils.random(20f, 50f) * threatFactor * type.speedMult;
+        ai.pursuitSpeed = Math.min(ai.speed * 1.2f, 140f * type.speedMult);
+        ai.detectionRange = MathUtils.random(80f, 150f);
+        if (type.ranged) {
+            ai.preferredRange = 110f; // s'arrête à distance de tir au lieu de foncer au contact
+        }
 
         CombatComponent combat = new CombatComponent();
 
@@ -472,6 +495,7 @@ public class GameScreen implements Screen {
         engine.getSystem(EnemyAttackSystem.class).update(delta);
         engine.getSystem(MovementSystem.class).update(delta);
         engine.getSystem(ProjectileSystem.class).update(delta);
+        engine.getSystem(EnemyProjectileSystem.class).update(delta);
         engine.getSystem(LootPickupSystem.class).update(delta);
         engine.getSystem(DeathSystem.class).update(delta);
 

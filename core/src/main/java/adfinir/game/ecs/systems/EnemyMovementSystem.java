@@ -50,7 +50,11 @@ public class EnemyMovementSystem extends IteratingSystem {
             ai.state = EnemyAIComponent.State.IDLE;
         }
 
-        if (ai.state == EnemyAIComponent.State.PURSUING) {
+        if (ai.state == EnemyAIComponent.State.PURSUING && ai.preferredRange > 0f && dist <= ai.preferredRange) {
+            // Tireur à distance déjà à portée : s'arrête au lieu de continuer à se rapprocher.
+            vel.vx = 0;
+            vel.vy = 0;
+        } else if (ai.state == EnemyAIComponent.State.PURSUING) {
             Vector2 nextStep = Pathfinding.findNextStep(map,
                 new Vector2(pos.x, pos.y),
                 new Vector2(playerPos.x, playerPos.y)

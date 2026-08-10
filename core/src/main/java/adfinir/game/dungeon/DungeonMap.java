@@ -82,17 +82,39 @@ public class DungeonMap {
 
     /** Retourne une position pixel aléatoire sur une tile de sol. */
     public Vector2 getRandomFloorPosition() {
+        return getRandomFloorPosition(0f);
+    }
+
+    /**
+     * Position pixel aléatoire sur une tile de sol, à au moins minDistFromSpawn
+     * pixels du point de spawn du joueur (évite qu'un ennemi apparaisse
+     * directement sur/à côté du joueur à l'entrée dans l'étage). Si aucune
+     * tile ne satisfait la contrainte (très petite carte), retombe sur
+     * n'importe quelle tile de sol plutôt que de bloquer le spawn.
+     */
+    public Vector2 getRandomFloorPosition(float minDistFromSpawn) {
+        float spawnPx = getSpawnPixelX();
+        float spawnPy = getSpawnPixelY();
+        float minDistSq = minDistFromSpawn * minDistFromSpawn;
+
         List<int[]> floors = new ArrayList<>();
+        List<int[]> farFloors = new ArrayList<>();
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                if (getTile(c, r) == TILE_FLOOR) {
-                    floors.add(new int[]{c, r});
-                }
+                if (getTile(c, r) != TILE_FLOOR) continue;
+                int[] tile = {c, r};
+                floors.add(tile);
+                float px = c * TILE_SIZE + TILE_SIZE / 2f;
+                float py = r * TILE_SIZE + TILE_SIZE / 2f;
+                float dx = px - spawnPx, dy = py - spawnPy;
+                if (dx * dx + dy * dy >= minDistSq) farFloors.add(tile);
             }
         }
-        if (floors.isEmpty()) return new Vector2(getSpawnPixelX(), getSpawnPixelY());
 
-        int[] picked = floors.get(MathUtils.random(floors.size()));
+        List<int[]> pool = farFloors.isEmpty() ? floors : farFloors;
+        if (pool.isEmpty()) return new Vector2(spawnPx, spawnPy);
+
+        int[] picked = pool.get(MathUtils.random(pool.size() - 1));
         float px = picked[0] * TILE_SIZE + TILE_SIZE / 2f;
         float py = picked[1] * TILE_SIZE + TILE_SIZE / 2f;
         return new Vector2(px, py);

@@ -15,4 +15,7 @@ public class EnemyAIComponent implements Component {
 
     public float detectionRange = 100f;
     public float pursuitSpeed = 40f;
+
+    /** Distance à laquelle un ennemi en poursuite s'arrête au lieu de continuer à se rapprocher (tireurs). */
+    public float preferredRange = 0f;
 }

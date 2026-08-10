@@ -1,6 +1,7 @@
 package adfinir.game.inventory;
 
 import adfinir.game.player.AttackShape;
+import adfinir.game.player.StatType;
 import java.util.Random;
 
 /**
@@ -12,8 +13,24 @@ public class ItemGenerator {
     /** Chance qu'un socket vide (au-delà du socket garanti) soit pré-équipé d'un mod. */
     private static final float SOCKET_PREFILL_CHANCE = 0.2f;
 
-    private static final String[] WEAPON_MOD_IDS = { "COMBO_BRUTAL", "COMBO_RAFALE" };
-    private static final String[] CAPACITY_MOD_IDS = { "EFFECT_GLACE", "EFFECT_FOUDRE" };
+    private static final String[] WEAPON_MOD_IDS = {
+        "COMBO_BRUTAL", "COMBO_RAFALE", "COMBO_ESTOC", "COMBO_TOURBILLON"
+    };
+    private static final String[] CAPACITY_MOD_IDS = {
+        "EFFECT_GLACE", "EFFECT_FOUDRE", "EFFECT_POISON", "EFFECT_VENT",
+        "MOD_EXPLOSIF", "MOD_REBOND", "MOD_DUPLICATION", "MOD_CELERITE", "MOD_TRAJECTOIRE"
+    };
+    private static final String[] ARTIFACT_IDS = {
+        "SYNERGIE_SANG", "COEUR_DE_FER", "BOTTES_AGILES", "FOCUS_ARCANIQUE"
+    };
+
+    /** name, base effect name, element, dégâts de base, vitesse, rayon, cooldown. */
+    private static final Object[][] CAPACITY_BASE_PROFILES = {
+        { "Sceptre de Flammes",  "Boule de Feu",    "FIRE",     15f, 300f, 12f, 0.8f },
+        { "Bâton de Glace",      "Éclat Glacé",     "ICE",      12f, 260f, 11f, 0.75f },
+        { "Fiole Toxique",       "Nuée Toxique",    "POISON",   9f,  220f, 14f, 0.9f },
+        { "Plume du Vent",       "Lame de Vent",    "WIND",     8f,  380f, 8f,  0.55f },
+    };
 
     public static Weapon generateWeapon() {
         return generateWeapon(1f);
@@ -53,8 +70,10 @@ public class ItemGenerator {
 
     public static Capacity generateCapacity(float threatFactor) {
         Rarity rarity = getRandomRarity(threatFactor);
-        CapacityEffect base = new CapacityEffect("Boule de Feu", 15f, 300f, 12f, "FIRE", 0.8f);
-        Capacity cap = new Capacity("Sceptre Arcanique", rarity, base);
+        Object[] profile = CAPACITY_BASE_PROFILES[rand.nextInt(CAPACITY_BASE_PROFILES.length)];
+        CapacityEffect base = new CapacityEffect((String) profile[1],
+            (Float) profile[3], (Float) profile[4], (Float) profile[5], (String) profile[2], (Float) profile[6]);
+        Capacity cap = new Capacity((String) profile[0], rarity, base);
 
         // Ajouter des modificateurs selon la rareté
         int modCount = rarity.bonusPropertyCount;
@@ -90,23 +109,53 @@ public class ItemGenerator {
 
     public static Artifact generateArtifact(float threatFactor) {
         Rarity rarity = getRandomRarity(threatFactor);
-        return createArtifactById("SYNERGIE_SANG", "Relique Ancienne", rarity);
+        String id = ARTIFACT_IDS[rand.nextInt(ARTIFACT_IDS.length)];
+        return createArtifactById(id, artifactNameFor(id), rarity);
+    }
+
+    private static String artifactNameFor(String passiveEffectId) {
+        switch (passiveEffectId) {
+            case "COEUR_DE_FER":     return "Cœur de Fer";
+            case "BOTTES_AGILES":    return "Bottes Agiles";
+            case "FOCUS_ARCANIQUE":  return "Focus Arcanique";
+            case "SYNERGIE_SANG":
+            default:                 return "Relique Ancienne";
+        }
     }
 
     /**
-     * Reconstruit un Artifact à partir de son passiveEffectId.
-     * Seule source de vérité pour l'association id -> logique d'effet (lambda) :
-     * utilisée à la fois par la génération procédurale et par SaveManager lors
-     * du chargement d'une sauvegarde (la lambda elle-même n'est pas sérialisable).
+     * Reconstruit un Artifact à partir de son passiveEffectId : bonus de stats
+     * (via Item.statBonuses, comme Armor) + une lambda d'effet passif — cette
+     * dernière n'est qu'un point d'extension pour l'instant (pas encore
+     * branchée sur un déclencheur de gameplay), donc pas sérialisée. Seule
+     * source de vérité pour l'association id -> définition : utilisée à la
+     * fois par la génération procédurale et par SaveManager lors du
+     * chargement d'une sauvegarde.
      */
     public static Artifact createArtifactById(String passiveEffectId, String name, Rarity rarity) {
+        Artifact artifact = new Artifact(name, rarity, passiveEffectId, (obj) -> {
+            // Point d'extension pour un futur effet passif déclenché en jeu (ex: on-hit, on-kill).
+        });
+        float mult = rarity.statMultiplier;
         switch (passiveEffectId) {
+            case "COEUR_DE_FER":
+                artifact.getStatBonuses().put(StatType.MAX_HP, 30f * mult);
+                artifact.getStatBonuses().put(StatType.DEF, 4f * mult);
+                break;
+            case "BOTTES_AGILES":
+                artifact.getStatBonuses().put(StatType.SPD, 18f * mult);
+                artifact.getStatBonuses().put(StatType.MAX_STAMINA, 15f * mult);
+                break;
+            case "FOCUS_ARCANIQUE":
+                artifact.getStatBonuses().put(StatType.MAG, 6f * mult);
+                artifact.getStatBonuses().put(StatType.STAMINA_REGEN, 1.5f * mult);
+                break;
             case "SYNERGIE_SANG":
             default:
-                return new Artifact(name, rarity, passiveEffectId, (obj) -> {
-                    // Logique de l'effet passif
-                });
+                artifact.getStatBonuses().put(StatType.ATK, 5f * mult);
+                break;
         }
+        return artifact;
     }
 
     /**
@@ -142,6 +191,18 @@ public class ItemGenerator {
                         5f * rarity.statMultiplier, 10f * rarity.statMultiplier,
                         0.25f, 0.1f, 0.05f, null, 20f, AttackShape.CONE)
                 ));
+            case "COMBO_ESTOC":
+                return new WeaponComboMod(modifierId, "Combo Estoc", rarity, java.util.Arrays.asList(
+                    new WeaponAttack("Estoc",
+                        20f * rarity.statMultiplier, 32f * rarity.statMultiplier,
+                        0.9f, 0.3f, 0.1f, null, 45f, AttackShape.RECTANGLE)
+                ));
+            case "COMBO_TOURBILLON":
+                return new WeaponComboMod(modifierId, "Combo Tourbillon", rarity, java.util.Arrays.asList(
+                    new WeaponAttack("Tourbillon",
+                        10f * rarity.statMultiplier, 16f * rarity.statMultiplier,
+                        0.45f, 0.25f, 0.3f, null, 40f, AttackShape.ARC)
+                ));
             case "EFFECT_GLACE":
                 return new CapacityEffectMod(modifierId, "Éclat de Glace", rarity,
                     new CapacityEffect("Éclat de Glace", 12f * rarity.statMultiplier, 250f, 10f, "ICE", 0.6f),
@@ -150,6 +211,34 @@ public class ItemGenerator {
                 return new CapacityEffectMod(modifierId, "Décharge", rarity,
                     null,
                     new CapacityModifier(CapacityModifier.ModType.RICOCHET, 1.0f));
+            case "EFFECT_POISON":
+                return new CapacityEffectMod(modifierId, "Nuée Toxique", rarity,
+                    new CapacityEffect("Nuée Toxique", 9f * rarity.statMultiplier, 220f, 14f, "POISON", 0.9f),
+                    null);
+            case "EFFECT_VENT":
+                return new CapacityEffectMod(modifierId, "Lame de Vent", rarity,
+                    new CapacityEffect("Lame de Vent", 8f * rarity.statMultiplier, 380f, 8f, "WIND", 0.55f),
+                    null);
+            case "MOD_EXPLOSIF":
+                return new CapacityEffectMod(modifierId, "Charge Explosive", rarity,
+                    null,
+                    new CapacityModifier(CapacityModifier.ModType.EXPLOSION, 1.0f));
+            case "MOD_REBOND":
+                return new CapacityEffectMod(modifierId, "Rebond", rarity,
+                    null,
+                    new CapacityModifier(CapacityModifier.ModType.BOUNCE, 1.0f));
+            case "MOD_DUPLICATION":
+                return new CapacityEffectMod(modifierId, "Duplication", rarity,
+                    null,
+                    new CapacityModifier(CapacityModifier.ModType.DUPLICATE, 1.0f));
+            case "MOD_CELERITE":
+                return new CapacityEffectMod(modifierId, "Célérité", rarity,
+                    null,
+                    new CapacityModifier(CapacityModifier.ModType.SPEED_UP, 1.0f));
+            case "MOD_TRAJECTOIRE":
+                return new CapacityEffectMod(modifierId, "Trajectoire Courbe", rarity,
+                    null,
+                    new CapacityModifier(CapacityModifier.ModType.ARC, 1.0f));
             default:
                 return null;
         }

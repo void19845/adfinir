@@ -13,11 +13,13 @@ public class EnemyStatsComponent implements Component, Pool.Poolable {
     public float def = 2f;
     public boolean isDead = false;
 
-    // Attaque de contact — appliquée par EnemyAttackSystem
+    // Attaque — appliquée par EnemyAttackSystem (contact si !ranged, projectile sinon)
     public float attackDamage = 5f;
     public float attackRange = 14f;
     public float attackCooldown = 1.0f;
     public float attackTimer = 0f;
+    /** true = tire un EnemyProjectileComponent à portée au lieu d'infliger des dégâts au contact. */
+    public boolean ranged = false;
 
     public EnemyStatsComponent() {
         reset();
