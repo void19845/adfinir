@@ -42,18 +42,9 @@ public class CombatSystem extends IteratingSystem {
         CombatComponent combat = combatMapper.get(entity);
         Weapon weapon = combat.weapon;
 
-        // Décompte des cooldowns (arme + compétence)
+        // Décompte du cooldown d'attaque
         if (combat.timer > 0) {
             combat.timer -= deltaTime;
-        }
-        if (combat.capacityTimer > 0) {
-            combat.capacityTimer -= deltaTime;
-        }
-        if (combat.capacityBursting) {
-            combat.capacityBurstTimer -= deltaTime;
-            if (combat.capacityBurstTimer <= 0f) {
-                combat.capacityBursting = false;
-            }
         }
 
         if (weapon == null || !combat.isAttacking) return;
@@ -87,7 +78,7 @@ public class CombatSystem extends IteratingSystem {
             for (Entity target : enemies) {
                 EnemyStatsComponent targetStats = enemyStatsMapper.get(target);
                 if (targetStats.isDead || combat.hitEntities.contains(target)) continue;
-                if (hits(origin, combat, weapon, range, target)) {
+                if (hits(origin, combat, currentAttack, range, target)) {
                     float damage = weapon.getModifiedDamage(combat.activeComboIndex);
                     DamageResolver.applyDamage(target, damage);
                     combat.hitEntities.add(target);
@@ -97,7 +88,7 @@ public class CombatSystem extends IteratingSystem {
             if (player == null || combat.hitEntities.contains(player)) return;
             PlayerStatsComponent targetStats = statsMapper.get(player);
             if (targetStats == null || targetStats.isDead) return;
-            if (hits(origin, combat, weapon, range, player)) {
+            if (hits(origin, combat, currentAttack, range, player)) {
                 float damage = weapon.getModifiedDamage(combat.activeComboIndex);
                 DamageResolver.applyDamage(player, damage);
                 combat.hitEntities.add(player);
@@ -105,9 +96,9 @@ public class CombatSystem extends IteratingSystem {
         }
     }
 
-    private boolean hits(TransformComponent origin, CombatComponent combat, Weapon weapon, float range, Entity target) {
+    private boolean hits(TransformComponent origin, CombatComponent combat, WeaponAttack currentAttack, float range, Entity target) {
         TransformComponent targetPos = transformMapper.get(target);
-        return AttackGeometry.overlaps(weapon.type.shape, origin.x, origin.y, combat.attackDirX, combat.attackDirY,
+        return AttackGeometry.overlaps(currentAttack.shape, origin.x, origin.y, combat.attackDirX, combat.attackDirY,
             range, targetPos.x, targetPos.y, AttackGeometry.HIT_RADIUS);
     }
 }

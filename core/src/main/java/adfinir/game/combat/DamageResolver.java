@@ -8,7 +8,7 @@ import com.badlogic.gdx.Gdx;
 /**
  * Point d'entrée unique pour appliquer des dégâts à une entité, qu'elle soit
  * le joueur ou un ennemi. Réutilisé par CombatSystem (coups d'armes) et
- * CapacityBurst (compétences) sans coupler ces systèmes entre eux.
+ * ProjectileSystem (compétences) sans coupler ces systèmes entre eux.
  */
 public class DamageResolver {
 

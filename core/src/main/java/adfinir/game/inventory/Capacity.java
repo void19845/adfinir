@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * Capacité active modulaire (inspirée de Noita).
- * Sockets : taille = rarity.bonusPropertyCount (COMMON=0, RARE=1, EPIC=2,
+ * Sockets : taille = rarity.bonusPropertyCount (COMMON=1, RARE=1, EPIC=2,
  * LEGENDARY=3, MYTHICAL=4), accueillent des CapacityEffectMod.
  */
 public class Capacity extends Item {

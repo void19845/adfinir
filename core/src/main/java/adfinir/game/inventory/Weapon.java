@@ -5,12 +5,17 @@ import java.util.List;
 
 /**
  * Arme modulaire avec un système de combos.
- * Sockets : taille = rarity.bonusPropertyCount (COMMON=0, RARE=1, EPIC=2,
+ * Sockets : taille = rarity.bonusPropertyCount (COMMON=1, RARE=1, EPIC=2,
  * LEGENDARY=3, MYTHICAL=4), accueillent des WeaponComboMod.
+ *
+ * Le comportement d'une arme est déterminé uniquement par son type (stats :
+ * range/damage/cooldown mods) et ses sockets : le combo entier vient des
+ * WeaponComboMod implantés, il n'y a plus d'attaque "de base" figée sur
+ * l'arme elle-même. ItemGenerator garantit qu'au moins un socket est rempli
+ * à la création pour qu'une arme ait toujours au moins une attaque.
  */
 public class Weapon extends Item {
     public final WeaponType type;
-    public final List<WeaponAttack> comboSlots = new ArrayList<>();
 
     /** Sockets de modificateurs (WeaponComboMod uniquement). */
     private final ItemModifier[] sockets;
@@ -19,10 +24,6 @@ public class Weapon extends Item {
         super(name, rarity);
         this.type = type;
         this.sockets = new ItemModifier[rarity.bonusPropertyCount];
-    }
-
-    public void addAttack(WeaponAttack attack) {
-        comboSlots.add(attack);
     }
 
     // ------------------------------------------------------------------
@@ -47,19 +48,13 @@ public class Weapon extends Item {
     }
 
     /**
-     * Combo effectif = combo de base + attaques apportées par chaque
-     * WeaponComboMod implanté, dans l'ordre des sockets. Recalculé à la volée
-     * (pas de cache) : CombatComponent/CombatSystem l'appellent directement,
-     * donc tout changement de socket est répercuté en temps réel en combat.
+     * Combo effectif = concaténation des attaques de chaque WeaponComboMod
+     * implanté, dans l'ordre des sockets. Recalculé à la volée (pas de
+     * cache) : CombatComponent/CombatSystem l'appellent directement, donc
+     * tout changement de socket est répercuté en temps réel en combat.
      */
     public List<WeaponAttack> getActiveCombo() {
-        boolean hasMod = false;
-        for (ItemModifier m : sockets) {
-            if (m instanceof WeaponComboMod) { hasMod = true; break; }
-        }
-        if (!hasMod) return comboSlots;
-
-        List<WeaponAttack> active = new ArrayList<>(comboSlots);
+        List<WeaponAttack> active = new ArrayList<>();
         for (ItemModifier mod : sockets) {
             if (mod instanceof WeaponComboMod) {
                 active.addAll(((WeaponComboMod) mod).comboAttacks);
@@ -86,9 +81,7 @@ public class Weapon extends Item {
 
     @Override
     public String getDescription() {
-        int extra = getActiveCombo().size() - comboSlots.size();
-        return String.format("%s (%s) - %s. Combos: %d%s",
-            name, rarity.name(), type.description, comboSlots.size(),
-            extra > 0 ? " (+" + extra + " via sockets)" : "");
+        return String.format("%s (%s) - %s. Combos: %d",
+            name, rarity.name(), type.description, getActiveCombo().size());
     }
 }

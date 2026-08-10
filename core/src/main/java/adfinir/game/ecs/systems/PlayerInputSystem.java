@@ -1,14 +1,12 @@
 package adfinir.game.ecs.systems;
 
-import adfinir.game.combat.CapacityBurst;
+import adfinir.game.ecs.components.CapacityComponent;
 import adfinir.game.ecs.components.CombatComponent;
 import adfinir.game.ecs.components.InventoryComponent;
 import adfinir.game.ecs.components.LootBarComponent;
 import adfinir.game.ecs.components.PlayerInputComponent;
 import adfinir.game.ecs.components.PlayerStatsComponent;
-import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
-import adfinir.game.inventory.Capacity;
 import adfinir.game.inventory.ItemGenerator;
 import adfinir.game.inventory.Weapon;
 import adfinir.game.inventory.WeaponType;
@@ -30,16 +28,13 @@ public class PlayerInputSystem extends IteratingSystem {
     private final ComponentMapper<VelocityComponent>    vm = ComponentMapper.getFor(VelocityComponent.class);
     private final ComponentMapper<PlayerInputComponent> pm = ComponentMapper.getFor(PlayerInputComponent.class);
     private final ComponentMapper<CombatComponent>      cm = ComponentMapper.getFor(CombatComponent.class);
+    private final ComponentMapper<CapacityComponent>    capm = ComponentMapper.getFor(CapacityComponent.class);
     private final ComponentMapper<InventoryComponent>   im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<LootBarComponent>     lbm = ComponentMapper.getFor(LootBarComponent.class);
     private final ComponentMapper<PlayerStatsComponent> sm = ComponentMapper.getFor(PlayerStatsComponent.class);
-    private final ComponentMapper<TransformComponent>   tm = ComponentMapper.getFor(TransformComponent.class);
 
-    private final Family enemyFamily;
-
-    public PlayerInputSystem(Family enemyFamily) {
+    public PlayerInputSystem() {
         super(Family.all(PlayerInputComponent.class, VelocityComponent.class).get(), 1);
-        this.enemyFamily = enemyFamily;
     }
 
     @Override
@@ -76,8 +71,8 @@ public class PlayerInputSystem extends IteratingSystem {
             }
         }
 
-        // Sort (Capacity équipée) : Touche Q
-        if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
+        // Sort (Capacity équipée) : Clic droit (JustPressed)
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
             tryCastCapacity(entity, input);
         }
 
@@ -120,26 +115,17 @@ public class PlayerInputSystem extends IteratingSystem {
         }
     }
 
+    /** Coût en stamina d'un cast de compétence (indépendant de la capacité équipée, comme les coups d'arme). */
+    private static final float CAPACITY_STAMINA_COST = 30f;
+
     private void tryCastCapacity(Entity entity, PlayerInputComponent input) {
+        CapacityComponent capacityComp = capm.get(entity);
         InventoryComponent inv = im.get(entity);
-        CombatComponent combat = cm.get(entity);
         PlayerStatsComponent stats = sm.get(entity);
-        TransformComponent origin = tm.get(entity);
-        if (inv == null || inv.capacity == null || combat == null || stats == null || origin == null) return;
-        if (!combat.canUseCapacity()) return;
+        if (capacityComp == null || inv == null || inv.capacity == null || stats == null) return;
+        if (!capacityComp.canCast()) return;
+        if (!stats.consumeStamina(CAPACITY_STAMINA_COST)) return;
 
-        Capacity cap = inv.capacity;
-        CapacityBurst.BurstParams p = CapacityBurst.resolve(cap);
-        if (!stats.consumeStamina(p.staminaCost)) return;
-
-        combat.capacityTimer = p.cooldown;
-        combat.capacityBursting = true;
-        combat.capacityBurstTimer = 0.15f;
-        combat.attackDirX = input.lastDirX;
-        combat.attackDirY = input.lastDirY;
-
-        float castX = origin.x + input.lastDirX * (p.radius * 0.5f);
-        float castY = origin.y + input.lastDirY * (p.radius * 0.5f);
-        CapacityBurst.applyBurst(getEngine(), enemyFamily, castX, castY, p.damage, p.radius);
+        capacityComp.trigger(input.lastDirX, input.lastDirY, inv.capacity.getActiveEffect().cooldown);
     }
 }

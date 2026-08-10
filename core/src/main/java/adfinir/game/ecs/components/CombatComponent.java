@@ -30,17 +30,8 @@ public class CombatComponent implements Component {
     // Entités déjà touchées pendant la fenêtre active courante (évite les hits multiples)
     public final Set<Entity> hitEntities = new HashSet<>();
 
-    // --- Compétence (Capacity) ---
-    public float capacityTimer = 0f;          // Cooldown de la compétence
-    public boolean capacityBursting = false;  // True pendant le court flash visuel du burst
-    public float capacityBurstTimer = 0f;     // Temps restant du flash visuel
-
     public boolean canAttack() {
         return timer <= 0f && weapon != null && !weapon.getActiveCombo().isEmpty();
-    }
-
-    public boolean canUseCapacity() {
-        return capacityTimer <= 0f;
     }
 
     public void triggerAttack(float dirX, float dirY) {

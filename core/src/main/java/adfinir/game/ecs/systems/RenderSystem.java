@@ -59,7 +59,9 @@ public class RenderSystem extends IteratingSystem {
 
             float dx = combat.attackDirX;
             float dy = combat.attackDirY;
-            AttackShape shape = weapon.type.shape;
+            java.util.List<adfinir.game.inventory.WeaponAttack> activeCombo = weapon.getActiveCombo();
+            if (combat.activeComboIndex >= activeCombo.size()) return; // combo raccourci en cours de swing
+            AttackShape shape = activeCombo.get(combat.activeComboIndex).shape;
             float range = AttackGeometry.computeRange(weapon, combat.activeComboIndex);
 
             if (shape == AttackShape.CONE) {
@@ -70,14 +72,6 @@ public class RenderSystem extends IteratingSystem {
                 Rectangle r = AttackGeometry.computeAxisAlignedRect(shape, pos.x, pos.y, dx, dy, range);
                 shapeRenderer.rect(r.x, r.y, r.width, r.height);
             }
-        }
-
-        // Flash visuel du burst de compétence
-        if (combat != null && combat.capacityBursting) {
-            shapeRenderer.setColor(Color.CYAN);
-            float cx = pos.x + combat.attackDirX * 10f;
-            float cy = pos.y + combat.attackDirY * 10f;
-            shapeRenderer.circle(cx, cy, 8f);
         }
     }
 }

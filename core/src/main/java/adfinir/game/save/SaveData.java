@@ -71,7 +71,6 @@ public class SaveData {
         public String name;
         public String rarity;   // Rarity.name()
         public String type;     // WeaponType.name()
-        public List<AttackSave> combos = new ArrayList<>();
         /** Un élément par socket (dans l'ordre), modifierId==null si le socket est vide. */
         public List<SocketSave> sockets = new ArrayList<>();
     }
@@ -80,17 +79,6 @@ public class SaveData {
     public static class SocketSave {
         public String modifierId; // null si socket vide
         public String rarity;     // Rarity.name(), null si socket vide
-    }
-
-    public static class AttackSave {
-        public String name;
-        public float minDamage;
-        public float maxDamage;
-        public float cooldown;
-        public float duration;
-        public float knockback;
-        public String element;  // nullable
-        public float areaOfEffect;
     }
 
     public static class ArmorSave {
@@ -107,6 +95,7 @@ public class SaveData {
         public float effectSpeed;
         public float effectRadius;
         public String effectType;
+        public float effectCooldown;
         public List<ModifierSave> modifiers = new ArrayList<>();
         /** Un élément par socket (dans l'ordre), modifierId==null si le socket est vide. */
         public List<SocketSave> sockets = new ArrayList<>();

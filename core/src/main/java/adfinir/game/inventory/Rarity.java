@@ -4,7 +4,7 @@ package adfinir.game.inventory;
  * Rareté globale influant sur les stats et le nombre de propriétés bonus.
  */
 public enum Rarity {
-    COMMON(1.0f, 0),
+    COMMON(1.0f, 1), // 1 socket garanti : sans lui une arme COMMON n'aurait aucune attaque
     RARE(1.1f, 1),
     EPIC(1.25f, 2),
     LEGENDARY(1.5f, 3),
