@@ -1,5 +1,10 @@
 package adfinir.game.dungeon;
 
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Représente la carte du donjon sous forme de grille d'entiers.
  *
@@ -7,6 +12,8 @@ package adfinir.game.dungeon;
  *   0 = VIDE (hors carte)
  *   1 = MUR
  *   2 = SOL
+ *   3 = SORTIE (vers l'étage suivant)
+ *   4 = LOOT (tile générant un objet au sol)
  */
 public class DungeonMap {
 
@@ -14,6 +21,7 @@ public class DungeonMap {
     public static final int TILE_WALL  = 1;
     public static final int TILE_FLOOR = 2;
     public static final int TILE_EXIT  = 3; // portail vers le niveau suivant
+    public static final int TILE_LOOT  = 4; // tile générant un objet de loot
 
     public static final int TILE_SIZE = 16; // pixels par tile
 
@@ -62,6 +70,24 @@ public class DungeonMap {
 
     /** Retourne la hauteur totale de la carte en pixels. */
     public float getPixelHeight() { return rows * TILE_SIZE; }
+
+    /** Retourne une position pixel aléatoire sur une tile de sol. */
+    public Vector2 getRandomFloorPosition() {
+        List<int[]> floors = new ArrayList<>();
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (getTile(c, r) == TILE_FLOOR) {
+                    floors.add(new int[]{c, r});
+                }
+            }
+        }
+        if (floors.isEmpty()) return new Vector2(getSpawnPixelX(), getSpawnPixelY());
+
+        int[] picked = floors.get(MathUtils.random(floors.size()));
+        float px = picked[0] * TILE_SIZE + TILE_SIZE / 2f;
+        float py = picked[1] * TILE_SIZE + TILE_SIZE / 2f;
+        return new Vector2(px, py);
+    }
 
     /**
      * Crée une carte de test statique (20×15 tiles).

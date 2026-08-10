@@ -1,30 +1,65 @@
 package adfinir.game.ecs.components;
 
+import adfinir.game.inventory.Weapon;
+import adfinir.game.inventory.WeaponAttack;
 import com.badlogic.ashley.core.Component;
-import com.badlogic.gdx.utils.Pool;
+import com.badlogic.ashley.core.Entity;
 
-public class CombatComponent implements Component, Pool.Poolable {
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-    public float attackRange     = 20f;
-    public float attackCooldown  = 0.4f;
-    public float currentCooldown = 0f;
-    public float knockbackForce  = 130f;
+/**
+ * Composant gérant l'état du combat d'une entité.
+ * Les statistiques d'attaque sont désormais déléguées à l'objet Weapon.
+ */
+public class CombatComponent implements Component {
+    // Arme actuellement équipée
+    public Weapon weapon;
 
-    /** Mis à true par PlayerInputSystem quand la touche d'attaque est pressée. */
-    public boolean wantsToAttack      = false;
+    // Direction de l'attaque au moment du déclenchement (normalisé)
+    public float attackDirX = 1f;
+    public float attackDirY = 0f;
 
-    // ── Attaque puissante (touche R) ──────────────────────────────────────
-    public float   powerRange         = 38f;
-    public float   powerCooldown      = 1.5f;
-    public float   powerCurrentCD     = 0f;
-    public boolean wantsPowerAttack   = false;
+    // --- État actuel ---
+    public float timer = 0f;            // Timer de cooldown
+    public boolean isAttacking = false; // True si l'entité est en train de frapper
+    public int comboIndex = 0;          // Indice de la PROCHAINE attaque du combo
+    public int activeComboIndex = 0;    // Indice de l'attaque EN COURS (fenêtre active actuelle)
 
-    @Override
-    public void reset() {
-        attackRange = 20f; attackCooldown = 0.4f;
-        currentCooldown = 0f; knockbackForce = 130f;
-        wantsToAttack = false;
-        powerRange = 38f; powerCooldown = 1.5f;
-        powerCurrentCD = 0f; wantsPowerAttack = false;
+    // Entités déjà touchées pendant la fenêtre active courante (évite les hits multiples)
+    public final Set<Entity> hitEntities = new HashSet<>();
+
+    // --- Compétence (Capacity) ---
+    public float capacityTimer = 0f;          // Cooldown de la compétence
+    public boolean capacityBursting = false;  // True pendant le court flash visuel du burst
+    public float capacityBurstTimer = 0f;     // Temps restant du flash visuel
+
+    public boolean canAttack() {
+        return timer <= 0f && weapon != null && !weapon.getActiveCombo().isEmpty();
+    }
+
+    public boolean canUseCapacity() {
+        return capacityTimer <= 0f;
+    }
+
+    public void triggerAttack(float dirX, float dirY) {
+        if (weapon == null) return;
+        List<WeaponAttack> combo = weapon.getActiveCombo();
+        if (combo.isEmpty()) return;
+
+        this.attackDirX = dirX;
+        this.attackDirY = dirY;
+        isAttacking = true;
+
+        // L'attaque qui va effectivement se jouer est celle pointée par comboIndex AVANT incrément
+        activeComboIndex = comboIndex;
+
+        // Utilise le cooldown de l'attaque actuelle du combo (base + sockets)
+        timer = weapon.getModifiedCooldown(activeComboIndex);
+
+        // Passe à l'attaque suivante pour le prochain coup
+        comboIndex = (comboIndex + 1) % combo.size();
+        hitEntities.clear();
     }
 }

@@ -2,7 +2,7 @@ package adfinir.game.ecs.systems;
 
 import adfinir.game.ecs.components.TransformComponent;
 import adfinir.game.ecs.components.VelocityComponent;
-import adfinir.game.world.WorldMap;
+import adfinir.game.dungeon.DungeonMap;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
@@ -13,9 +13,9 @@ public class MovementSystem extends IteratingSystem {
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
     private final ComponentMapper<VelocityComponent>  vm = ComponentMapper.getFor(VelocityComponent.class);
 
-    private final WorldMap map;
+    private final DungeonMap map;
 
-    public MovementSystem(WorldMap map) {
+    public MovementSystem(DungeonMap map) {
         super(Family.all(TransformComponent.class, VelocityComponent.class).get(), 2);
         this.map = map;
     }
@@ -28,24 +28,22 @@ public class MovementSystem extends IteratingSystem {
         float nextX = pos.x + vel.vx * deltaTime;
         float nextY = pos.y + vel.vy * deltaTime;
 
-        float half = 5f; // demi-hitbox (légèrement < taille visuelle)
+        // Hitbox : 12x12 pixels centrée sur (pos.x, pos.y)
+        // On teste les 4 coins pour éviter le clipping entre deux tiles.
+        float half = 5f; // demi-taille de la hitbox (légèrement < taille visuelle)
 
-        // Axe X
+        // --- Axe X : tester les 4 coins sur nextX avec pos.y actuel ---
         boolean blockedX = map.isSolid(nextX - half, pos.y - half)
                         || map.isSolid(nextX + half, pos.y - half)
                         || map.isSolid(nextX - half, pos.y + half)
                         || map.isSolid(nextX + half, pos.y + half);
         if (!blockedX) pos.x = nextX;
 
-        // Axe Y
+        // --- Axe Y : tester les 4 coins sur nextY avec pos.x déjà mis à jour ---
         boolean blockedY = map.isSolid(pos.x - half, nextY - half)
                         || map.isSolid(pos.x + half, nextY - half)
                         || map.isSolid(pos.x - half, nextY + half)
                         || map.isSolid(pos.x + half, nextY + half);
         if (!blockedY) pos.y = nextY;
-
-        // Clamp dans les limites du monde
-        pos.x = Math.max(half, Math.min(map.getPixelWidth()  - half, pos.x));
-        pos.y = Math.max(half, Math.min(map.getPixelHeight() - half, pos.y));
     }
 }

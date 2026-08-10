@@ -1,165 +1,113 @@
 package adfinir.game.ecs.systems;
 
-import adfinir.game.DamageQueue;
-import adfinir.game.ecs.components.*;
-import adfinir.game.items.Artifact;
-import adfinir.game.items.Item;
-import adfinir.game.items.ItemDatabase;
-import com.badlogic.ashley.core.*;
+import adfinir.game.combat.AttackGeometry;
+import adfinir.game.combat.DamageResolver;
+import adfinir.game.ecs.components.CombatComponent;
+import adfinir.game.ecs.components.EnemyStatsComponent;
+import adfinir.game.ecs.components.PlayerStatsComponent;
+import adfinir.game.ecs.components.TransformComponent;
+import adfinir.game.inventory.Weapon;
+import adfinir.game.inventory.WeaponAttack;
+import com.badlogic.ashley.core.ComponentMapper;
+import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 /**
- * Gère les attaques du joueur sur les mobs.
- *
- * Deux modes :
- *  - Attaque rapide  (Space/F) : dégâts normaux, courte portée
- *  - Attaque puissante (R)     : 2× dégâts, portée large, frappe plusieurs mobs
+ * Détecte les coups d'arme (hitbox = même géométrie que RenderSystem, via
+ * AttackGeometry) et applique les dégâts via DamageResolver. Aujourd'hui seul
+ * le joueur porte une Weapon active (les ennemis attaquent via EnemyAttackSystem,
+ * un simple contact) mais la résolution reste générique côté attaquant.
  */
 public class CombatSystem extends IteratingSystem {
+    private final ComponentMapper<CombatComponent> combatMapper = ComponentMapper.getFor(CombatComponent.class);
+    private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper.getFor(TransformComponent.class);
+    private final ComponentMapper<PlayerStatsComponent> statsMapper = ComponentMapper.getFor(PlayerStatsComponent.class);
+    private final ComponentMapper<EnemyStatsComponent> enemyStatsMapper = ComponentMapper.getFor(EnemyStatsComponent.class);
 
-    private static final Random RNG = new Random();
+    private final Entity player;
+    private final Family enemyFamily;
 
-    private final ComponentMapper<TransformComponent> tm  = ComponentMapper.getFor(TransformComponent.class);
-    private final ComponentMapper<CombatComponent>    cm  = ComponentMapper.getFor(CombatComponent.class);
-    private final ComponentMapper<StatsComponent>     sm  = ComponentMapper.getFor(StatsComponent.class);
-    private final ComponentMapper<InventoryComponent> im  = ComponentMapper.getFor(InventoryComponent.class);
-    private final ComponentMapper<HealthComponent>    hm  = ComponentMapper.getFor(HealthComponent.class);
-    private final ComponentMapper<MobAIComponent>     aim = ComponentMapper.getFor(MobAIComponent.class);
-    private final ComponentMapper<LootDropComponent>  lm  = ComponentMapper.getFor(LootDropComponent.class);
-
-    private ImmutableArray<Entity> mobs;
-    private final List<Entity> toRemove = new ArrayList<>();
-
-    public CombatSystem() {
-        super(Family.all(TransformComponent.class, CombatComponent.class, StatsComponent.class).get(), 5);
+    public CombatSystem(Entity player, Family enemyFamily) {
+        super(Family.all(CombatComponent.class, TransformComponent.class).get(), 10);
+        this.player = player;
+        this.enemyFamily = enemyFamily;
     }
 
     @Override
-    public void addedToEngine(Engine engine) {
-        super.addedToEngine(engine);
-        mobs = engine.getEntitiesFor(
-            Family.all(TransformComponent.class, MobAIComponent.class, HealthComponent.class).get()
-        );
-    }
+    protected void processEntity(Entity entity, float deltaTime) {
+        CombatComponent combat = combatMapper.get(entity);
+        Weapon weapon = combat.weapon;
 
-    @Override
-    public void update(float deltaTime) {
-        toRemove.clear();
-        super.update(deltaTime);
-        for (Entity e : toRemove) getEngine().removeEntity(e);
-    }
-
-    @Override
-    protected void processEntity(Entity attacker, float dt) {
-        CombatComponent    combat = cm.get(attacker);
-        TransformComponent pos    = tm.get(attacker);
-        StatsComponent     stats  = sm.get(attacker);
-        InventoryComponent inv    = im.get(attacker);
-
-        // Mise à jour des cooldowns
-        if (combat.currentCooldown  > 0) { combat.currentCooldown  -= dt; combat.wantsToAttack    = false; }
-        if (combat.powerCurrentCD   > 0) { combat.powerCurrentCD   -= dt; combat.wantsPowerAttack  = false; }
-
-        float fx = (pos.facingX == 0 && pos.facingY == 0) ? 0f  : pos.facingX;
-        float fy = (pos.facingX == 0 && pos.facingY == 0) ? -1f : pos.facingY;
-
-        // ── Attaque rapide ─────────────────────────────────────────────
-        if (combat.wantsToAttack && combat.currentCooldown <= 0) {
-            combat.wantsToAttack   = false;
-            combat.currentCooldown = combat.attackCooldown;
-            float atk = effectiveAtk(stats, inv);
-            float cx  = pos.x + fx * (combat.attackRange * 0.5f);
-            float cy  = pos.y + fy * (combat.attackRange * 0.5f);
-            strikeInZone(cx, cy, combat.attackRange, atk, combat.knockbackForce,
-                         false, stats, inv, attacker);
+        // Décompte des cooldowns (arme + compétence)
+        if (combat.timer > 0) {
+            combat.timer -= deltaTime;
+        }
+        if (combat.capacityTimer > 0) {
+            combat.capacityTimer -= deltaTime;
+        }
+        if (combat.capacityBursting) {
+            combat.capacityBurstTimer -= deltaTime;
+            if (combat.capacityBurstTimer <= 0f) {
+                combat.capacityBursting = false;
+            }
         }
 
-        // ── Attaque puissante ──────────────────────────────────────────
-        if (combat.wantsPowerAttack && combat.powerCurrentCD <= 0) {
-            combat.wantsPowerAttack = false;
-            combat.powerCurrentCD   = combat.powerCooldown;
-            float atk = effectiveAtk(stats, inv) * 2.2f;
-            float cx  = pos.x + fx * (combat.powerRange * 0.4f);
-            float cy  = pos.y + fy * (combat.powerRange * 0.4f);
-            strikeInZone(cx, cy, combat.powerRange, atk, combat.knockbackForce * 1.6f,
-                         true, stats, inv, attacker);
+        if (weapon == null || !combat.isAttacking) return;
+
+        List<WeaponAttack> activeCombo = weapon.getActiveCombo();
+        if (combat.activeComboIndex >= activeCombo.size()) {
+            // Un socket a changé pendant l'attaque (combo raccourci) : on coupe proprement.
+            combat.isAttacking = false;
+            return;
+        }
+
+        WeaponAttack currentAttack = activeCombo.get(combat.activeComboIndex);
+        boolean windowActive = combat.timer >= currentAttack.cooldown - currentAttack.duration;
+
+        if (windowActive) {
+            resolveHit(entity, combat, weapon, currentAttack);
+        } else {
+            combat.isAttacking = false;
         }
     }
 
-    // ── Frappe dans une zone ───────────────────────────────────────────────
+    /** Teste et applique les dégâts de la fenêtre active courante contre les cibles adverses. */
+    private void resolveHit(Entity attacker, CombatComponent combat, Weapon weapon, WeaponAttack currentAttack) {
+        TransformComponent origin = transformMapper.get(attacker);
+        float range = AttackGeometry.computeRange(weapon, combat.activeComboIndex);
 
-    private void strikeInZone(float cx, float cy, float range, float atk, float knockback,
-                               boolean isPower, StatsComponent stats, InventoryComponent inv,
-                               Entity attacker) {
-        for (Entity mob : mobs) {
-            MobAIComponent ai = aim.get(mob);
-            if (ai == null || ai.state == MobAIComponent.State.DEAD) continue;
+        boolean attackerIsPlayer = statsMapper.has(attacker);
 
-            TransformComponent mpos = tm.get(mob);
-            float dx = mpos.x - cx, dy = mpos.y - cy;
-            float d  = (float) Math.sqrt(dx * dx + dy * dy);
-            if (d > range) continue;
-
-            HealthComponent mobHp = hm.get(mob);
-            if (mobHp == null) continue;
-
-            // Dégâts (critique inclus)
-            float critRate = stats.critRate + (inv != null ? inv.getArtifactCritRate() : 0f);
-            float critDmg  = stats.critDmg  + (inv != null ? inv.getArtifactCritDmg()  : 0f);
-            boolean crit   = RNG.nextFloat() < critRate;
-            float dmg      = Math.max(1f, atk);
-            if (crit) dmg *= critDmg;
-
-            mobHp.currentHealth = Math.max(0f, mobHp.currentHealth - dmg);
-
-            // Damage number flottant
-            DamageQueue.push(mpos.x, mpos.y + 10f, dmg, crit);
-
-            // Knockback
-            float klen = d > 0.01f ? d : 1f;
-            ai.knockVx    = (dx / klen) * knockback;
-            ai.knockVy    = (dy / klen) * knockback;
-            ai.knockTimer = isPower ? 0.28f : 0.18f;
-
-            // Mort
-            if (mobHp.currentHealth <= 0) {
-                grantLootAndXp(attacker, mob, stats, inv);
-                toRemove.add(mob);
+        if (attackerIsPlayer) {
+            ImmutableArray<Entity> enemies = getEngine().getEntitiesFor(enemyFamily);
+            for (Entity target : enemies) {
+                EnemyStatsComponent targetStats = enemyStatsMapper.get(target);
+                if (targetStats.isDead || combat.hitEntities.contains(target)) continue;
+                if (hits(origin, combat, weapon, range, target)) {
+                    float damage = weapon.getModifiedDamage(combat.activeComboIndex);
+                    DamageResolver.applyDamage(target, damage);
+                    combat.hitEntities.add(target);
+                }
+            }
+        } else {
+            if (player == null || combat.hitEntities.contains(player)) return;
+            PlayerStatsComponent targetStats = statsMapper.get(player);
+            if (targetStats == null || targetStats.isDead) return;
+            if (hits(origin, combat, weapon, range, player)) {
+                float damage = weapon.getModifiedDamage(combat.activeComboIndex);
+                DamageResolver.applyDamage(player, damage);
+                combat.hitEntities.add(player);
             }
         }
     }
 
-    // ── Loot & XP ─────────────────────────────────────────────────────────
-
-    private void grantLootAndXp(Entity attacker, Entity mob,
-                                  StatsComponent stats, InventoryComponent inv) {
-        LootDropComponent loot = lm.get(mob);
-        if (loot == null) return;
-
-        stats.xp += loot.xpReward;
-        while (stats.tryLevelUp()) { /* chain */ }
-
-        if (inv == null) return;
-        Object drop = ItemDatabase.randomDrop(RNG, loot.dropChance);
-        if (drop instanceof Item)     inv.autoEquip((Item) drop);
-        else if (drop instanceof Artifact) {
-            inv.addArtifact((Artifact) drop);
-            // Auto-équiper si le slot est libre
-            Artifact art = (Artifact) drop;
-            if (inv.getEquippedArtifact(art.slot) == null) inv.equipArtifact(art);
-        }
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────
-
-    private float effectiveAtk(StatsComponent stats, InventoryComponent inv) {
-        float atk = stats.atk;
-        if (inv != null) atk += inv.getWeaponAtkBonus() + inv.getArtifactAtk();
-        return atk;
+    private boolean hits(TransformComponent origin, CombatComponent combat, Weapon weapon, float range, Entity target) {
+        TransformComponent targetPos = transformMapper.get(target);
+        return AttackGeometry.overlaps(weapon.type.shape, origin.x, origin.y, combat.attackDirX, combat.attackDirY,
+            range, targetPos.x, targetPos.y, AttackGeometry.HIT_RADIUS);
     }
 }
